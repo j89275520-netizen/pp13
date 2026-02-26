@@ -1037,7 +1037,7 @@ ${JSON.stringify(trades, null, 2)}
     const res=await fetch('https://misty-truth-3915.j89275520.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:8192,system:systemPrompt,messages:trimmedHistory})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:8192,system:systemPrompt,messages:trimmedHistory})
     });
     
     // JSON 파싱 실패 대비
