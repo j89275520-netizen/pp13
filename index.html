@@ -917,6 +917,7 @@ function addMsg(role, text, imgs) {
       .replace(/```[\w:]*\n?([\s\S]*?)```/g,(_,c)=>`<pre>${c.trim()}</pre>`)
       .replace(/\n(?!<)/g,'<br>')
       .trim();
+    if(!bubble.innerHTML.trim()) bubble.innerHTML='✅ DB 반영 완료';
   } else { bubble.textContent=text; }
   wrap.appendChild(bubble);
   const t=document.createElement('div'); t.className='msg-time';
@@ -1002,24 +1003,27 @@ ${JSON.stringify(trades, null, 2)}
 - 분석 결과에 명백히 이상하거나 애매한 항목이 있을 때만 질문
 - 매도정정/취소 등 청산여부가 진짜 불분명할 때만 질문
 
-## 응답 형식
-변경사항 한 줄 설명 (코드블럭 내용은 말로 설명하지 말 것)
+## 응답 형식 (필수)
+변경사항 한 줄 설명
 
-포트폴리오 변경 시:
+반드시 아래 코드블럭 형식으로 출력할 것:
+
+포트폴리오 변경 시 반드시 출력:
 \`\`\`json:DB_UPDATE
 { ...전체 포트폴리오 JSON... }
 \`\`\`
 
-매매기록 추가/변경 시:
+매매기록 추가/변경 시 반드시 출력:
 \`\`\`json:TRADES_UPDATE
 [ ...전체 매매기록 배열... ]
 \`\`\`
 
+⚠️ 코드블럭 없으면 DB에 반영 안 됨. 반드시 출력할 것.
 두 가지 모두 변경되면 둘 다 출력.
 스샷에서 종목명/매매구분/체결수량/체결가격 읽어서 반영.
 
 ## 출력 규칙
-- 계산 과정 출력 금지
+- 계산 과정 설명 금지
 - 항목명·값 줄 분리 표기`;
 
   // 이전 대화에서 이미지 제거 (텍스트만 유지) - 용량 절약
