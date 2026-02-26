@@ -912,7 +912,11 @@ function addMsg(role, text, imgs) {
   const bubble=document.createElement('div');
   bubble.className=`msg ${role}`;
   if(role==='ai'&&text.includes('```')){
-    bubble.innerHTML=text.replace(/```[\w:]*\n?([\s\S]*?)```/g,(_,c)=>`<pre>${c.trim()}</pre>`).replace(/\n(?!<)/g,'<br>');
+    bubble.innerHTML=text
+      .replace(/```json:(DB_UPDATE|TRADES_UPDATE)[\s\S]*?```/g, '')
+      .replace(/```[\w:]*\n?([\s\S]*?)```/g,(_,c)=>`<pre>${c.trim()}</pre>`)
+      .replace(/\n(?!<)/g,'<br>')
+      .trim();
   } else { bubble.textContent=text; }
   wrap.appendChild(bubble);
   const t=document.createElement('div'); t.className='msg-time';
@@ -992,14 +996,14 @@ ${JSON.stringify(trades, null, 2)}
 - type: "손절" 또는 "판단청산"
 - memo: 메모 (선택)
 
-## ⚠️ 최우선 규칙: 불확실하면 반드시 먼저 질문
-- 애매한 항목이 하나라도 있으면 DB 수정 금지
-- 매도정정/취소/정정 등 청산여부 불분명 시 반드시 확인
-- 질문할 때는 DB_UPDATE/TRADES_UPDATE 코드블럭 출력 금지
-- 모든 항목 확정 후에만 수정
+## ⚠️ 행동 규칙
+- 지시사항이나 스샷 분석 결과가 명확하면 묻지 말고 바로 반영
+- 확인 질문 금지 ("이렇게 할까요?" 같은 거 절대 금지)
+- 분석 결과에 명백히 이상하거나 애매한 항목이 있을 때만 질문
+- 매도정정/취소 등 청산여부가 진짜 불분명할 때만 질문
 
-## 확정된 경우 응답 형식
-변경사항 설명 (1-3줄)
+## 응답 형식
+변경사항 한 줄 설명 (코드블럭 내용은 말로 설명하지 말 것)
 
 포트폴리오 변경 시:
 \`\`\`json:DB_UPDATE
@@ -1014,8 +1018,8 @@ ${JSON.stringify(trades, null, 2)}
 두 가지 모두 변경되면 둘 다 출력.
 스샷에서 종목명/매매구분/체결수량/체결가격 읽어서 반영.
 
-■ 출력 규칙
-- 계산 요약 출력 금지
+## 출력 규칙
+- 계산 과정 출력 금지
 - 항목명·값 줄 분리 표기`;
 
   // 이전 대화에서 이미지 제거 (텍스트만 유지) - 용량 절약
@@ -1033,7 +1037,7 @@ ${JSON.stringify(trades, null, 2)}
     const res=await fetch('https://misty-truth-3915.j89275520.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2048,system:systemPrompt,messages:trimmedHistory})
+      body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:8192,system:systemPrompt,messages:trimmedHistory})
     });
     
     // JSON 파싱 실패 대비
