@@ -389,6 +389,28 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
     <div class="divider"></div>
 
     <div class="s-section">
+      <div class="s-title">📋 DB 붙여넣기 (Claude 대화에서 복사)</div>
+      <div class="s-desc">Claude에서 출력한 JSON을 복사해서 각각 붙여넣기하면 해당 DB만 교체됩니다.<br>다른 데이터는 건드리지 않습니다.</div>
+      
+      <div class="s-label">포트폴리오 JSON</div>
+      <textarea class="s-textarea" id="pastePortfolio" style="min-height:100px;" placeholder='{"us":[...],"kr":[...]} 형식의 JSON 붙여넣기'></textarea>
+      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyPortfolio()">포트폴리오 적용</button>
+      <div class="s-status" id="pastePortfolioStatus"></div>
+
+      <div class="s-label" style="margin-top:14px;">매매기록 JSON</div>
+      <textarea class="s-textarea" id="pasteTrades" style="min-height:100px;" placeholder='[{"sym":"DFEN",...},...] 형식의 JSON 붙여넣기'></textarea>
+      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyTrades()">매매기록 적용</button>
+      <div class="s-status" id="pasteTradesStatus"></div>
+
+      <div class="s-label" style="margin-top:14px;">운영규칙 텍스트</div>
+      <textarea class="s-textarea" id="pasteRules" style="min-height:100px;" placeholder="운영규칙 텍스트 붙여넣기"></textarea>
+      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyRules()">운영규칙 적용</button>
+      <div class="s-status" id="pasteRulesStatus"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="s-section">
       <div class="s-title">홈화면 추가</div>
       <div class="s-desc" id="installGuide"></div>
     </div>
@@ -598,8 +620,8 @@ function loadChatHistory() {
 }
 function saveChatHistory() {
   try {
-    // 최근 10턴만 저장 (토큰 절약)
-    const recent = chatHistory.slice(-10);
+    // 최근 20턴 저장
+    const recent = chatHistory.slice(-20);
     // 저장 시 이미지 base64 제거
     const cleaned = recent.map(msg => {
       if(Array.isArray(msg.content)) {
@@ -1129,8 +1151,8 @@ sym, market(US/KR), tag, entryDate, exitDate, entryPrice, exitPrice, qty, pnl(%)
     ? systemPrompt + `\n\n## 현재 매매기록 DB\n${JSON.stringify(trades)}`
     : systemPrompt;
 
-  // 최근 10개만 API에 전송 (토큰 절약)
-  const recentHistory = chatHistory.slice(-10);
+  // 최근 20개 API에 전송
+  const recentHistory = chatHistory.slice(-20);
 
   const trimmedHistory = recentHistory.map((msg, idx) => {
     if(idx === recentHistory.length - 1) return msg; // 마지막(현재) 메시지는 이미지 유지
@@ -1167,7 +1189,7 @@ sym, market(US/KR), tag, entryDate, exitDate, entryPrice, exitPrice, qty, pnl(%)
     const res=await fetch('https://misty-truth-3915.j89275520.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:8192,system:fullSystemPrompt,messages:validHistory})
+      body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:8192,system:fullSystemPrompt,messages:validHistory})
     });
     
     // JSON 파싱 실패 대비
@@ -1272,6 +1294,53 @@ function resetChat(){
   localStorage.removeItem('v2_chat_ui');
   document.getElementById('chatMsgs').innerHTML='';
   alert('채팅 초기화 완료');
+}
+
+// ── DB 붙여넣기 ──
+function pasteApplyPortfolio(){
+  const raw=document.getElementById('pastePortfolio').value.trim();
+  if(!raw){ setStatus('pastePortfolioStatus','❌ 내용을 붙여넣어주세요','err'); return; }
+  try{
+    const obj=JSON.parse(raw);
+    if(!obj.us||!obj.kr) throw new Error('us/kr 필드 없음');
+    portfolio=obj;
+    savePortfolio();
+    renderPortfolio();
+    document.getElementById('pastePortfolio').value='';
+    setStatus('pastePortfolioStatus','✅ 포트폴리오 적용 완료 (매매기록 유지)','ok');
+  }catch(e){
+    setStatus('pastePortfolioStatus','❌ JSON 파싱 오류: '+e.message,'err');
+  }
+}
+function pasteApplyTrades(){
+  const raw=document.getElementById('pasteTrades').value.trim();
+  if(!raw){ setStatus('pasteTradesStatus','❌ 내용을 붙여넣어주세요','err'); return; }
+  try{
+    const arr=JSON.parse(raw);
+    if(!Array.isArray(arr)) throw new Error('배열 형식이 아님');
+    trades=arr;
+    saveTrades();
+    renderTrades();
+    document.getElementById('pasteTrades').value='';
+    setStatus('pasteTradesStatus','✅ 매매기록 적용 완료 (포트폴리오 유지)','ok');
+  }catch(e){
+    setStatus('pasteTradesStatus','❌ JSON 파싱 오류: '+e.message,'err');
+  }
+}
+function pasteApplyRules(){
+  const raw=document.getElementById('pasteRules').value.trim();
+  if(!raw){ setStatus('pasteRulesStatus','❌ 내용을 붙여넣어주세요','err'); return; }
+  const prev=loadRules();
+  if(raw!==prev){
+    const hist=getRulesHistory();
+    hist.unshift({time:new Date().toISOString(),content:prev});
+    if(hist.length>20) hist.pop();
+    localStorage.setItem('v2_rules_history',JSON.stringify(hist));
+  }
+  localStorage.setItem('v2_rules',raw);
+  document.getElementById('rulesEditor').value=raw;
+  document.getElementById('pasteRules').value='';
+  setStatus('pasteRulesStatus','✅ 운영규칙 적용 완료','ok');
 }
 
 function detectPlatform() {
