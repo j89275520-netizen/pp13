@@ -423,6 +423,11 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 </div>
 
 <!-- IMAGE MODAL -->
+<div id="msgMenu" style="display:none;position:fixed;z-index:10000;background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.5);min-width:160px;">
+  <div onclick="msgMenuCopy()" style="padding:14px 18px;cursor:pointer;font-size:14px;color:var(--text);">복사</div>
+  <div style="height:1px;background:var(--border);"></div>
+  <div onclick="msgMenuSelect()" style="padding:14px 18px;cursor:pointer;font-size:14px;color:var(--text);">텍스트 선택</div>
+</div>
 <div id="imgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;" onclick="closeImgModal()">
   <img id="imgModalImg" style="max-width:95vw;max-height:90vh;border-radius:8px;object-fit:contain;">
 </div>
@@ -598,10 +603,11 @@ function switchPage(name, btn) {
   }
 }
 window.addEventListener('popstate', function(e) {
-  // 이미지 모달이 열려있으면 닫기
+  // 이미지 미리보기/모달이 열려있으면 닫기
   const modal = document.getElementById('imgModal');
   if(modal && modal.style.display === 'flex') {
     modal.style.display = 'none';
+    modal.onclick = function(){ closeImgModal(); }; // 복구
     return;
   }
   if(e.state && e.state.page) {
@@ -809,6 +815,12 @@ function renderStats() {
 // CHAT
 // ═══════════════════════════════════════════════
 function handleFiles(e) {
+  // 이미지 선택 후 첫번째 이미지 미리보기
+  if(e.target.files && e.target.files.length === 1) {
+    const url = URL.createObjectURL(e.target.files[0]);
+    showImgPreviewBeforeAdd(url, e);
+    return;
+  }
   Array.from(e.target.files).forEach(file=>{
     const r=new FileReader();
     r.onload=ev=>{
@@ -858,6 +870,90 @@ function handleKey(e){
 }
 
 // 이미지 확대 모달
+// 메시지 컨텍스트 메뉴
+let _msgMenuTarget = null;
+function msgMenuCopy(){
+  const menu = document.getElementById('msgMenu');
+  const bubble = menu._targetBubble;
+  if(bubble) navigator.clipboard.writeText(bubble.innerText||bubble.textContent||'');
+  menu.style.display='none';
+}
+function msgMenuSelect(){
+  const menu = document.getElementById('msgMenu');
+  const bubble = menu._targetBubble;
+  menu.style.display='none';
+  if(!bubble) return;
+  bubble.contentEditable = 'true';
+  bubble.focus();
+  const range = document.createRange();
+  range.selectNodeContents(bubble);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  bubble.addEventListener('blur', function once(){ bubble.contentEditable='false'; bubble.removeEventListener('blur',once); }, {once:true});
+}
+document.addEventListener('click', function(){ document.getElementById('msgMenu').style.display='none'; });
+
+function showImgPreviewBeforeAdd(url, originalEvent){
+  const m = document.getElementById('imgModal');
+  const img = document.getElementById('imgModalImg');
+  img.src = url;
+  m.style.display = 'flex';
+  // 하단에 버튼 추가
+  let btnRow = document.getElementById('imgPreviewBtnRow');
+  if(!btnRow){
+    btnRow = document.createElement('div');
+    btnRow.id = 'imgPreviewBtnRow';
+    btnRow.style.cssText = 'position:absolute;bottom:20px;display:flex;gap:16px;';
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = '추가';
+    confirmBtn.style.cssText = 'padding:10px 28px;background:var(--accent);color:#000;border:none;border-radius:20px;font-size:15px;font-weight:700;cursor:pointer;';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '취소';
+    cancelBtn.style.cssText = 'padding:10px 28px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:20px;font-size:15px;cursor:pointer;';
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    m.appendChild(btnRow);
+    confirmBtn.onclick = function(e){
+      e.stopPropagation();
+      m.style.display='none';
+      history.back();
+      // 실제 파일 처리
+      processFiles(originalEvent);
+    };
+    cancelBtn.onclick = function(e){
+      e.stopPropagation();
+      m.style.display='none';
+      history.back();
+      originalEvent.target.value='';
+    };
+  } else {
+    const btns = btnRow.querySelectorAll('button');
+    btns[1].onclick = function(e){ e.stopPropagation(); m.style.display='none'; history.back(); processFiles(originalEvent); };
+    btns[0].onclick = function(e){ e.stopPropagation(); m.style.display='none'; history.back(); originalEvent.target.value=''; };
+  }
+  history.pushState({imgPreview:true}, '');
+  m.onclick = null; // 바깥 클릭으로 닫히지 않게
+}
+function processFiles(e){
+  const files = e.target.files;
+  if(!files) return;
+  let count = 0;
+  Array.from(files).forEach(file => {
+    const r = new FileReader();
+    r.onload = ev => {
+      const dataUrl = ev.target.result;
+      const b64 = dataUrl.split(',')[1];
+      pendingImgs.push({dataUrl, b64, type:'image/jpeg'});
+      sessionStorage.setItem('pendingImgs', JSON.stringify(pendingImgs));
+      count++;
+      if(count === files.length) renderPreviews();
+    };
+    r.readAsDataURL(file);
+  });
+  e.target.value='';
+}
+
 function showImgModal(src){
   const m=document.getElementById('imgModal');
   document.getElementById('imgModalImg').src=src;
@@ -928,6 +1024,16 @@ function addMsg(role, text, imgs) {
       .trim();
     if(!bubble.innerHTML.trim()) bubble.innerHTML='✅ DB 반영 완료';
   } else { bubble.textContent=text; }
+  bubble.addEventListener('click', function(e){
+    const menu = document.getElementById('msgMenu');
+    menu._targetBubble = bubble;
+    menu.style.display = 'block';
+    const x = Math.min(e.clientX, window.innerWidth - 180);
+    const y = Math.min(e.clientY, window.innerHeight - 100);
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    e.stopPropagation();
+  });
   wrap.appendChild(bubble);
   const t=document.createElement('div'); t.className='msg-time';
   t.textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
@@ -1057,7 +1163,7 @@ ${JSON.stringify(portfolio, null, 2)}
     const res=await fetch('https://misty-truth-3915.j89275520.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:8192,system:fullSystemPrompt,messages:trimmedHistory})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:8192,system:fullSystemPrompt,messages:trimmedHistory})
     });
     
     // JSON 파싱 실패 대비
