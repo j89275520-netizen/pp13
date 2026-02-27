@@ -189,20 +189,24 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
   background:var(--bg); border:1px solid var(--border); border-radius:8px;
   padding:10px; overflow-x:auto; font-size:11px; margin-top:6px; white-space:pre;
 }
+/* 말풍선 컨텍스트 메뉴 */
+.msg-ctx {
+  position:fixed; z-index:9999;
+  background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  box-shadow:0 4px 20px rgba(0,0,0,.6); overflow:hidden;
+  min-width:140px;
+}
+.msg-ctx-btn {
+  display:block; width:100%; padding:12px 16px;
+  background:none; border:none; border-bottom:1px solid var(--border);
+  color:var(--text); font-family:var(--sans); font-size:13px;
+  text-align:left; cursor:pointer;
+}
+.msg-ctx-btn:last-child { border-bottom:none; }
+.msg-ctx-btn:active { background:var(--bg3); }
 .msg-time { font-size:9px; color:var(--text2); margin-top:3px; font-family:var(--mono); }
 .msg-imgs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; align-self:flex-end; }
-.msg-img-wrap { position:relative; display:inline-block; }
-.msg-img { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
-.img-expand {
-  position:absolute; top:4px; right:4px;
-  background:rgba(0,0,0,.55); border:none; color:white;
-  width:22px; height:22px; border-radius:5px; font-size:12px;
-  cursor:pointer; display:flex; align-items:center; justify-content:center;
-  backdrop-filter:blur(4px);
-}
-.img-prev-wrap .img-expand {
-  top:4px; right:4px;
-}
+.msg-img { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; }
 .loading-dots { display:flex; gap:4px; padding:12px 16px; align-self:flex-start; }
 .dot { width:7px; height:7px; background:var(--accent); border-radius:50%; animation:bounce 1.2s infinite; }
 .dot:nth-child(2) { animation-delay:.2s; }
@@ -576,7 +580,7 @@ function loadChatHistory() {
       if(Array.isArray(msg.content)) {
         // 이미지 제거 (저장된 base64가 깨질 수 있음)
         const textOnly = msg.content.filter(c => c.type === 'text' && c.text);
-        if(!textOnly.length) return {...msg, content: [{type:'text', text:'(이미지)'}]};
+        if(!textOnly.length) return {...msg, content: [{type:'text', text:'(스크린샷 전송됨 - 이전 AI 응답에 분석결과 있음)'}]};
         return {...msg, content: textOnly};
       }
       return msg;
@@ -600,7 +604,7 @@ function saveChatHistory() {
     const cleaned = recent.map(msg => {
       if(Array.isArray(msg.content)) {
         const textOnly = msg.content.filter(c => c.type === 'text');
-        if(!textOnly.length) return {...msg, content: [{type:'text', text:'(이미지)'}]};
+        if(!textOnly.length) return {...msg, content: [{type:'text', text:'(스크린샷 전송됨 - 이전 AI 응답에 분석결과 있음)'}]};
         return {...msg, content: textOnly};
       }
       return msg;
@@ -647,6 +651,7 @@ function switchPage(name, btn) {
   if(name==='portfolio') renderPortfolio();
   if(name==='trades')    renderTrades();
   if(name==='stats')     renderStats();
+  if(name==='chat')      renderPreviews();
   if(name !== _currentPage) {
     history.pushState({page: name}, '', '');
     _currentPage = name;
@@ -897,8 +902,7 @@ function handleFiles(e) {
 function renderPreviews() {
   document.getElementById('imgPreviews').innerHTML=pendingImgs.map((img,i)=>`
     <div class="img-prev-wrap">
-      <img class="img-prev" src="${img.dataUrl}">
-      <button class="img-expand" onclick="event.stopPropagation();previewPendingImg(${i})">⤢</button>
+      <img class="img-prev" src="${img.dataUrl}" onclick="previewPendingImg(${i})">
       <button class="img-rm" onclick="event.stopPropagation();rmImg(${i})">×</button>
     </div>`).join('');
 }
@@ -931,6 +935,42 @@ function closeImgModal(){
   m.style.display='none';
   m.dataset.open='false';
 }
+
+// ── 말풍선 컨텍스트 메뉴 ──
+let _ctxEl=null;
+function showMsgCtx(e, bubble) {
+  e.preventDefault(); e.stopPropagation();
+  closeMsgCtx();
+  const rect=bubble.getBoundingClientRect();
+  const menu=document.createElement('div');
+  menu.className='msg-ctx'; menu.id='msgCtxMenu';
+  menu.innerHTML=`<button class="msg-ctx-btn" onclick="copyMsgText()">📋 메시지 복사</button><button class="msg-ctx-btn" onclick="selectMsgText()">✏️ 텍스트 선택</button>`;
+  // 위치 계산
+  let top=rect.top - 90; if(top<10) top=rect.bottom+4;
+  let left=rect.left; if(left+150>window.innerWidth) left=window.innerWidth-155;
+  menu.style.position='fixed'; menu.style.top=top+'px'; menu.style.left=left+'px';
+  document.body.appendChild(menu);
+  _ctxEl=bubble;
+}
+function closeMsgCtx(){ const m=document.getElementById('msgCtxMenu'); if(m)m.remove(); _ctxEl=null; }
+function copyMsgText(){
+  if(!_ctxEl) return;
+  const text=_ctxEl.innerText||_ctxEl.textContent;
+  navigator.clipboard.writeText(text).then(()=>{}).catch(()=>{});
+  closeMsgCtx();
+}
+function selectMsgText(){
+  if(!_ctxEl) return;
+  const range=document.createRange();
+  range.selectNodeContents(_ctxEl);
+  const sel=window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+  closeMsgCtx();
+}
+document.addEventListener('click',closeMsgCtx);
+document.addEventListener('touchstart',function(e){
+  if(!e.target.closest('.msg-ctx')) closeMsgCtx();
+});
 
 // 채팅 기록을 로컬에 저장 (이미지 제외 - 용량 절약)
 function saveChatMessages(){
@@ -975,21 +1015,23 @@ function addMsg(role, text, imgs) {
   if(imgs&&imgs.length){
     const d=document.createElement('div'); d.className='msg-imgs';
     imgs.forEach(src=>{
-      const wrap=document.createElement('div');
-      wrap.className='msg-img-wrap';
       const im=document.createElement('img');
       im.className='msg-img'; im.src=src;
-      const btn=document.createElement('button');
-      btn.className='img-expand'; btn.textContent='⤢';
-      btn.onclick=(e)=>{e.stopPropagation();showImgModal(src);};
-      wrap.appendChild(im);
-      wrap.appendChild(btn);
-      d.appendChild(wrap);
+      im.onclick=()=>showImgModal(src);
+      d.appendChild(im);
     });
     wrap.appendChild(d);
   }
   const bubble=document.createElement('div');
   bubble.className=`msg ${role}`;
+  // 말풍선 터치 메뉴
+  let _pressTimer=null;
+  bubble.addEventListener('touchstart',function(e){
+    _pressTimer=setTimeout(()=>showMsgCtx(e,bubble),400);
+  },{passive:false});
+  bubble.addEventListener('touchend',()=>clearTimeout(_pressTimer));
+  bubble.addEventListener('touchmove',()=>clearTimeout(_pressTimer));
+  bubble.addEventListener('contextmenu',function(e){showMsgCtx(e,bubble);});
   if(role==='ai'&&text.includes('```')){
     bubble.innerHTML=text
       .replace(/```json:(DB_UPDATE|TRADES_UPDATE)[\s\S]*?```/g, '')
@@ -1041,69 +1083,43 @@ async function sendMsg() {
   chatHistory.push({role:'user',content:userContent});
   saveChatHistory();
 
-  const systemPrompt=`당신은 주식 포트폴리오 관리 AI입니다. 매매 원칙과 현재 DB를 기준으로 사용자 지시에 따라 포트폴리오와 매매기록을 업데이트합니다.
+  const systemPrompt=`## ⚠️ 최우선 행동 규칙 (반드시 지킬 것)
+1. 확인 질문 절대 금지. "반영할까요?", "이렇게 할까요?", "맞나요?" 금지
+2. 스샷/텍스트 받으면 즉시 분석 → 계산 → DB 업데이트 코드블럭 출력
+3. 정보 부족해도 스샷에서 읽은 정보로 최대한 반영
+4. 매매 원칙(아래)에 있는 계산공식을 반드시 따를 것
+5. 이전 대화에서 "(스크린샷 전송됨)"이 있으면 그때 분석한 내용이 AI 응답에 있으니 참고할 것
 
-## 매매 원칙
+## 매매 원칙 (이 계산식대로 반드시 계산)
 ${loadRules()}
-
-## 현재 포트폴리오 DB
-${JSON.stringify(portfolio)}
-
-## 매매기록 항목 (trades 배열의 각 객체)
-- sym: 종목코드
-- market: "US" 또는 "KR"
-- tag: 진입방식 (눌림매매/중간매매/돌파매매 등)
-- entryDate: 진입일 (YYYY-MM-DD)
-- exitDate: 청산일 (YYYY-MM-DD)
-- entryPrice: 진입가 (숫자)
-- exitPrice: 청산가 (숫자)
-- qty: 수량
-- pnl: 수익률% (소수점, 예: 5.23)
-- holdDays: 보유일수 (숫자)
-- entryGap: 진입괴리율 (예: "+5.2%")
-- stopDist: 손절거리% (예: "8.5%")
-- weight: 진입비중% (예: "23.5%")
-- rVal: R값 (소수점, 예: 1.23)
-- type: "손절" 또는 "판단청산"
-- memo: 메모 (선택)
-
-## ⚠️ 행동 규칙 (절대 준수)
-- 스샷/텍스트 분석 즉시 DB 업데이트 — 확인 질문 절대 금지
-- "반영할까요?", "이렇게 할까요?", "맞나요?" 등 일절 금지
-- 분석 → 계산 → DB_UPDATE/TRADES_UPDATE 코드블럭 출력을 한 응답에서 완료
-- 정보가 부족해도 스샷에서 읽을 수 있는 정보로 최대한 반영
-- 청산여부가 진짜 불분명(매도정정/취소 등)할 때만 질문
 
 ## 매매기록 계산 규칙
 - weight(진입비중%) = 실제매수금액(체결가×수량) / 총자본금액(3030만원) × 100
-  예: 체결가 96,050원 × 2주 = 192,100원 → 192,100/30,300,000×100 = 0.63%
 - entryGap(진입괴리율) = (레버현재가 - 레버20일선환산가) / 레버현재가 × 100
   레버20일선환산가 = 본주20일선×0.99 기준으로 레버환산공식 적용
   비레버 종목은 (진입가-20일선)/20일선×100
 
+## 현재 포트폴리오 DB
+${JSON.stringify(portfolio)}
+
+## 매매기록 항목 필드
+sym, market(US/KR), tag, entryDate, exitDate, entryPrice, exitPrice, qty, pnl(%), holdDays, entryGap, stopDist, weight, rVal, type(손절/판단청산), memo
+
 ## 응답 형식 (필수)
-변경사항 한 줄 설명
+변경사항 한 줄 설명 후 반드시 코드블럭 출력:
 
-반드시 아래 코드블럭 형식으로 출력할 것:
-
-포트폴리오 변경 시 반드시 출력:
 \`\`\`json:DB_UPDATE
 { ...전체 포트폴리오 JSON... }
 \`\`\`
 
-매매기록 추가/변경 시 반드시 출력:
 \`\`\`json:TRADES_UPDATE
 [ ...전체 매매기록 배열... ]
 \`\`\`
 
-⚠️ 코드블럭 없으면 DB에 반영 안 됨. 반드시 출력할 것.
-두 가지 모두 변경되면 둘 다 출력.
+코드블럭 없으면 DB 반영 안 됨. 반드시 출력.
+둘 다 변경되면 둘 다 출력.
 스샷에서 종목명/매매구분/체결수량/체결가격 읽어서 반영.
-
-## 출력 규칙
-- 계산 과정 설명 금지
-- 항목명·값 줄 분리 표기
-- 질문 금지 — 무조건 DB 업데이트 코드블럭 포함해서 응답`;
+계산 과정 설명 금지. 질문 금지.`;
 
   // 이전 대화에서 이미지 제거 (텍스트만 유지) - 용량 절약
   // 매매기록 관련 요청이면 trades DB를 마지막 메시지 앞에 추가
@@ -1121,7 +1137,7 @@ ${JSON.stringify(portfolio)}
     if(Array.isArray(msg.content)){
       const textOnly = msg.content.filter(c=>c.type==='text');
       // 텍스트 없어도 메시지 순서 유지 (빈 텍스트로 대체)
-      if(!textOnly.length) return {...msg, content:[{type:'text',text:'(이미지)'}]};
+      if(!textOnly.length) return {...msg, content:[{type:'text',text:'(스크린샷 전송됨 - 이전 AI 응답에 분석결과 있음)'}]};
       return {...msg, content: textOnly};
     }
     // content가 string이면 배열로 변환
@@ -1270,12 +1286,16 @@ function detectPlatform() {
 // INIT
 // ═══════════════════════════════════════════════
 window.onload=()=>{
+  // IIFE 백업 복원 후 다시 로드 (순서 보장)
+  portfolio=loadPortfolio();
+  trades=loadTrades();
   renderPortfolio();
   document.getElementById('rulesEditor').value=loadRules();
   detectPlatform();
   const key=localStorage.getItem('v2_api_key');
   if(key){ document.getElementById('apiKeyInput').value=key; setStatus('apiStatus','✅ API 키 등록됨','ok'); }
   loadChatMessages();
+  renderPreviews();
 };
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
