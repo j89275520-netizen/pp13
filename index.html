@@ -598,6 +598,12 @@ function switchPage(name, btn) {
   }
 }
 window.addEventListener('popstate', function(e) {
+  // 이미지 모달이 열려있으면 닫기
+  const modal = document.getElementById('imgModal');
+  if(modal && modal.style.display === 'flex') {
+    modal.style.display = 'none';
+    return;
+  }
   if(e.state && e.state.page) {
     const btn = document.querySelector(`.nav-btn[onclick*="${e.state.page}"]`);
     if(btn) {
@@ -856,8 +862,11 @@ function showImgModal(src){
   const m=document.getElementById('imgModal');
   document.getElementById('imgModalImg').src=src;
   m.style.display='flex';
+  history.pushState({modal:true}, '');
 }
-function closeImgModal(){ document.getElementById('imgModal').style.display='none'; }
+function closeImgModal(){ 
+  document.getElementById('imgModal').style.display='none'; 
+}
 
 // 채팅 기록을 로컬에 저장 (이미지 제외 - 용량 절약)
 function saveChatMessages(){
@@ -976,9 +985,6 @@ ${loadRules()}
 ## 현재 포트폴리오 DB
 ${JSON.stringify(portfolio, null, 2)}
 
-## 현재 매매기록 DB
-${JSON.stringify(trades, null, 2)}
-
 ## 매매기록 항목 (trades 배열의 각 객체)
 - sym: 종목코드
 - market: "US" 또는 "KR"
@@ -992,16 +998,19 @@ ${JSON.stringify(trades, null, 2)}
 - holdDays: 보유일수 (숫자)
 - entryGap: 진입괴리율 (예: "+5.2%")
 - stopDist: 손절거리% (예: "8.5%")
-- weight: 진입비중% (예: "23.5%")
+- weight: 진입비중% = 실제매수금액/총자본금액×100 (예: "23.5%")
+- entryGap: 진입괴리율 = (레버현재가 - 레버20일선환산가)/레버현재가×100
+  레버20일선환산가 = 본주20일선×0.99 기준으로 레버환산공식 적용
+  (비레버 종목은 (진입가-20일선)/20일선×100)
 - rVal: R값 (소수점, 예: 1.23)
 - type: "손절" 또는 "판단청산"
 - memo: 메모 (선택)
 
 ## ⚠️ 행동 규칙
-- 지시사항이나 스샷 분석 결과가 명확하면 묻지 말고 바로 반영
-- 확인 질문 금지 ("이렇게 할까요?" 같은 거 절대 금지)
-- 분석 결과에 명백히 이상하거나 애매한 항목이 있을 때만 질문
-- 매도정정/취소 등 청산여부가 진짜 불분명할 때만 질문
+- 계산결과나 스샷 분석 결과가 나오면 확인 없이 즉시 DB 업데이트
+- 확인 질문 절대 금지 ("반영할까요?", "이렇게 할까요?" 등 일절 금지)
+- 분석 → 계산 → DB 업데이트를 한번에 처리
+- 청산여부가 진짜 불분명(매도정정/취소 등)할 때만 질문
 
 ## 응답 형식 (필수)
 변경사항 한 줄 설명
@@ -1027,6 +1036,13 @@ ${JSON.stringify(trades, null, 2)}
 - 항목명·값 줄 분리 표기`;
 
   // 이전 대화에서 이미지 제거 (텍스트만 유지) - 용량 절약
+  // 매매기록 관련 요청이면 trades DB를 마지막 메시지 앞에 추가
+  const tradeKeywords = ['청산', '매도', '손절', '매매기록', 'trades', '수익률', 'pnl', 'TRADES'];
+  const needsTrades = tradeKeywords.some(k => (text||'').includes(k));
+  const fullSystemPrompt = needsTrades 
+    ? systemPrompt + `\n\n## 현재 매매기록 DB\n${JSON.stringify(trades, null, 2)}`
+    : systemPrompt;
+
   const trimmedHistory = chatHistory.map((msg, idx) => {
     if(idx === chatHistory.length - 1) return msg; // 마지막(현재) 메시지는 이미지 유지
     if(Array.isArray(msg.content)){
@@ -1041,7 +1057,7 @@ ${JSON.stringify(trades, null, 2)}
     const res=await fetch('https://misty-truth-3915.j89275520.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:8192,system:systemPrompt,messages:trimmedHistory})
+      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:8192,system:fullSystemPrompt,messages:trimmedHistory})
     });
     
     // JSON 파싱 실패 대비
