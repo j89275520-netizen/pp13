@@ -191,7 +191,18 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 }
 .msg-time { font-size:9px; color:var(--text2); margin-top:3px; font-family:var(--mono); }
 .msg-imgs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; align-self:flex-end; }
+.msg-img-wrap { position:relative; display:inline-block; }
 .msg-img { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
+.img-expand {
+  position:absolute; top:4px; right:4px;
+  background:rgba(0,0,0,.55); border:none; color:white;
+  width:22px; height:22px; border-radius:5px; font-size:12px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.img-prev-wrap .img-expand {
+  top:4px; right:4px;
+}
 .loading-dots { display:flex; gap:4px; padding:12px 16px; align-self:flex-start; }
 .dot { width:7px; height:7px; background:var(--accent); border-radius:50%; animation:bounce 1.2s infinite; }
 .dot:nth-child(2) { animation-delay:.2s; }
@@ -330,8 +341,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
     <div class="chat-msgs" id="chatMsgs">
       <div class="msg system">스샷 + 지시사항을 입력하면<br>포폴·매매기록을 자동 업데이트합니다</div>
     </div>
-    <button id="scrollBtn" onclick="document.getElementById('chatMsgs').scrollTop=document.getElementById('chatMsgs').scrollHeight" style="display:none;position:absolute;bottom:80px;right:16px;z-index:50;background:var(--accent2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);">↓</button>
-    <button id="scrollDownBtn" onclick="document.getElementById('chatMsgs').scrollTop=document.getElementById('chatMsgs').scrollHeight" style="position:absolute;bottom:80px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-size:18px;cursor:pointer;display:none;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.4);">↓</button>
+    <button id="scrollBtn" onclick="document.getElementById('chatMsgs').scrollTop=document.getElementById('chatMsgs').scrollHeight" style="position:absolute;bottom:80px;right:16px;z-index:50;background:var(--accent2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);">↓</button>
     <div class="input-area">
       <div class="img-previews" id="imgPreviews"></div>
       <div class="input-row">
@@ -387,6 +397,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <button class="s-btn dim" style="margin-top:6px;" onclick="importData()">📥 백업 파일로 복구</button>
       <button class="s-btn red" style="margin-top:12px;" onclick="resetPortfolio()">포트폴리오 초기화</button>
       <button class="s-btn red" style="margin-top:6px;" onclick="resetTrades()">매매기록 초기화</button>
+      <button class="s-btn red" style="margin-top:6px;" onclick="resetChat()">채팅 기록 초기화</button>
     </div>
 
   </div>
@@ -546,12 +557,56 @@ function loadTrades() {
   try { const s=localStorage.getItem('v2_trades'); return s?JSON.parse(s):[...DEFAULT_TRADES]; } catch(e){return [];}
 }
 function loadChatHistory() {
-  try { const s=localStorage.getItem('v2_chat_history'); return s?JSON.parse(s):[]; } catch(e){return [];}
+  try {
+    const s=localStorage.getItem('v2_chat_history');
+    if(!s) return [];
+    let arr=JSON.parse(s);
+    if(!Array.isArray(arr)) return [];
+    // 검증: 각 메시지가 올바른 형식인지 확인
+    arr = arr.filter(msg => {
+      if(!msg || !msg.role || !msg.content) return false;
+      if(msg.role !== 'user' && msg.role !== 'assistant') return false;
+      return true;
+    });
+    // content 정규화: string이면 배열로 변환
+    arr = arr.map(msg => {
+      if(typeof msg.content === 'string') {
+        return {...msg, content: [{type:'text', text: msg.content}]};
+      }
+      if(Array.isArray(msg.content)) {
+        // 이미지 제거 (저장된 base64가 깨질 수 있음)
+        const textOnly = msg.content.filter(c => c.type === 'text' && c.text);
+        if(!textOnly.length) return {...msg, content: [{type:'text', text:'(이미지)'}]};
+        return {...msg, content: textOnly};
+      }
+      return msg;
+    });
+    // user/assistant 교대 보장: 깨지면 초기화
+    for(let i=1; i<arr.length; i++){
+      if(arr[i].role === arr[i-1].role) {
+        console.warn('chatHistory 순서 깨짐 → 초기화');
+        localStorage.removeItem('v2_chat_history');
+        return [];
+      }
+    }
+    return arr;
+  } catch(e) { return []; }
 }
-function saveChatHistory() { 
-  // 최근 20턴만 저장 (토큰 절약)
-  const recent = chatHistory.slice(-20);
-  localStorage.setItem('v2_chat_history', JSON.stringify(recent));
+function saveChatHistory() {
+  try {
+    // 최근 10턴만 저장 (토큰 절약)
+    const recent = chatHistory.slice(-10);
+    // 저장 시 이미지 base64 제거
+    const cleaned = recent.map(msg => {
+      if(Array.isArray(msg.content)) {
+        const textOnly = msg.content.filter(c => c.type === 'text');
+        if(!textOnly.length) return {...msg, content: [{type:'text', text:'(이미지)'}]};
+        return {...msg, content: textOnly};
+      }
+      return msg;
+    });
+    localStorage.setItem('v2_chat_history', JSON.stringify(cleaned));
+  } catch(e) {}
 }
 function savePortfolio() { localStorage.setItem('v2_portfolio', JSON.stringify(portfolio)); }
 function saveTrades()    { localStorage.setItem('v2_trades', JSON.stringify(trades)); }
@@ -598,10 +653,14 @@ function switchPage(name, btn) {
   }
 }
 window.addEventListener('popstate', function(e) {
-  // 이미지 모달이 열려있으면 닫기
+  // 이미지 모달이 열려있으면 닫기 (앱 종료 안 함)
   const modal = document.getElementById('imgModal');
-  if(modal && modal.style.display === 'flex') {
-    modal.style.display = 'none';
+  if(modal && modal.dataset.open === 'true') {
+    closeImgModal();
+    return;
+  }
+  if(e.state && e.state.modal === 'imgModal') {
+    // 모달 열기 state인데 모달이 닫혀있으면 무시
     return;
   }
   if(e.state && e.state.page) {
@@ -838,10 +897,12 @@ function handleFiles(e) {
 function renderPreviews() {
   document.getElementById('imgPreviews').innerHTML=pendingImgs.map((img,i)=>`
     <div class="img-prev-wrap">
-      <img class="img-prev" src="${img.dataUrl}" onclick="showImgModal('${img.dataUrl}')">
-      <button class="img-rm" onclick="rmImg(${i})">×</button>
+      <img class="img-prev" src="${img.dataUrl}">
+      <button class="img-expand" onclick="event.stopPropagation();previewPendingImg(${i})">⤢</button>
+      <button class="img-rm" onclick="event.stopPropagation();rmImg(${i})">×</button>
     </div>`).join('');
 }
+function previewPendingImg(i){ if(pendingImgs[i]) showImgModal(pendingImgs[i].dataUrl); }
 function rmImg(i){ pendingImgs.splice(i,1); sessionStorage.setItem("pendingImgs", JSON.stringify(pendingImgs)); renderPreviews(); }
 function autoResize(ta){ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,120)+'px'; }
 
@@ -862,10 +923,13 @@ function showImgModal(src){
   const m=document.getElementById('imgModal');
   document.getElementById('imgModalImg').src=src;
   m.style.display='flex';
-  history.pushState({modal:true}, '');
+  m.dataset.open='true';
+  history.pushState({modal:'imgModal'}, '');
 }
 function closeImgModal(){ 
-  document.getElementById('imgModal').style.display='none'; 
+  const m=document.getElementById('imgModal');
+  m.style.display='none';
+  m.dataset.open='false';
 }
 
 // 채팅 기록을 로컬에 저장 (이미지 제외 - 용량 절약)
@@ -911,10 +975,16 @@ function addMsg(role, text, imgs) {
   if(imgs&&imgs.length){
     const d=document.createElement('div'); d.className='msg-imgs';
     imgs.forEach(src=>{
+      const wrap=document.createElement('div');
+      wrap.className='msg-img-wrap';
       const im=document.createElement('img');
       im.className='msg-img'; im.src=src;
-      im.onclick=()=>showImgModal(src);
-      d.appendChild(im);
+      const btn=document.createElement('button');
+      btn.className='img-expand'; btn.textContent='⤢';
+      btn.onclick=(e)=>{e.stopPropagation();showImgModal(src);};
+      wrap.appendChild(im);
+      wrap.appendChild(btn);
+      d.appendChild(wrap);
     });
     wrap.appendChild(d);
   }
@@ -935,7 +1005,6 @@ function addMsg(role, text, imgs) {
   msgs.appendChild(wrap);
   msgs.scrollTop=msgs.scrollHeight;
   saveChatMessages();
-  const btn=document.getElementById('scrollDownBtn'); if(btn) btn.style.display='none';
 }
 
 function showLoading(){
@@ -946,12 +1015,7 @@ function showLoading(){
 }
 function hideLoading(){ const el=document.getElementById('loadDots'); if(el)el.remove(); }
 
-function loadChatHistory(){
-  try{ const s=localStorage.getItem('v2_chat_history'); return s?JSON.parse(s):[]; }catch(e){return [];}
-}
-function saveChatHistory(){
-  try{ localStorage.setItem('v2_chat_history', JSON.stringify(chatHistory.slice(-30))); }catch(e){}
-}
+// loadChatHistory / saveChatHistory는 상단에 정의됨
 
 async function sendMsg() {
   const ta=document.getElementById('textInput');
@@ -983,7 +1047,7 @@ async function sendMsg() {
 ${loadRules()}
 
 ## 현재 포트폴리오 DB
-${JSON.stringify(portfolio, null, 2)}
+${JSON.stringify(portfolio)}
 
 ## 매매기록 항목 (trades 배열의 각 객체)
 - sym: 종목코드
@@ -998,19 +1062,24 @@ ${JSON.stringify(portfolio, null, 2)}
 - holdDays: 보유일수 (숫자)
 - entryGap: 진입괴리율 (예: "+5.2%")
 - stopDist: 손절거리% (예: "8.5%")
-- weight: 진입비중% = 실제매수금액/총자본금액×100 (예: "23.5%")
-- entryGap: 진입괴리율 = (레버현재가 - 레버20일선환산가)/레버현재가×100
-  레버20일선환산가 = 본주20일선×0.99 기준으로 레버환산공식 적용
-  (비레버 종목은 (진입가-20일선)/20일선×100)
+- weight: 진입비중% (예: "23.5%")
 - rVal: R값 (소수점, 예: 1.23)
 - type: "손절" 또는 "판단청산"
 - memo: 메모 (선택)
 
-## ⚠️ 행동 규칙
-- 계산결과나 스샷 분석 결과가 나오면 확인 없이 즉시 DB 업데이트
-- 확인 질문 절대 금지 ("반영할까요?", "이렇게 할까요?" 등 일절 금지)
-- 분석 → 계산 → DB 업데이트를 한번에 처리
+## ⚠️ 행동 규칙 (절대 준수)
+- 스샷/텍스트 분석 즉시 DB 업데이트 — 확인 질문 절대 금지
+- "반영할까요?", "이렇게 할까요?", "맞나요?" 등 일절 금지
+- 분석 → 계산 → DB_UPDATE/TRADES_UPDATE 코드블럭 출력을 한 응답에서 완료
+- 정보가 부족해도 스샷에서 읽을 수 있는 정보로 최대한 반영
 - 청산여부가 진짜 불분명(매도정정/취소 등)할 때만 질문
+
+## 매매기록 계산 규칙
+- weight(진입비중%) = 실제매수금액(체결가×수량) / 총자본금액(3030만원) × 100
+  예: 체결가 96,050원 × 2주 = 192,100원 → 192,100/30,300,000×100 = 0.63%
+- entryGap(진입괴리율) = (레버현재가 - 레버20일선환산가) / 레버현재가 × 100
+  레버20일선환산가 = 본주20일선×0.99 기준으로 레버환산공식 적용
+  비레버 종목은 (진입가-20일선)/20일선×100
 
 ## 응답 형식 (필수)
 변경사항 한 줄 설명
@@ -1033,32 +1102,56 @@ ${JSON.stringify(portfolio, null, 2)}
 
 ## 출력 규칙
 - 계산 과정 설명 금지
-- 항목명·값 줄 분리 표기`;
+- 항목명·값 줄 분리 표기
+- 질문 금지 — 무조건 DB 업데이트 코드블럭 포함해서 응답`;
 
   // 이전 대화에서 이미지 제거 (텍스트만 유지) - 용량 절약
   // 매매기록 관련 요청이면 trades DB를 마지막 메시지 앞에 추가
   const tradeKeywords = ['청산', '매도', '손절', '매매기록', 'trades', '수익률', 'pnl', 'TRADES'];
   const needsTrades = tradeKeywords.some(k => (text||'').includes(k));
   const fullSystemPrompt = needsTrades 
-    ? systemPrompt + `\n\n## 현재 매매기록 DB\n${JSON.stringify(trades, null, 2)}`
+    ? systemPrompt + `\n\n## 현재 매매기록 DB\n${JSON.stringify(trades)}`
     : systemPrompt;
 
-  const trimmedHistory = chatHistory.map((msg, idx) => {
-    if(idx === chatHistory.length - 1) return msg; // 마지막(현재) 메시지는 이미지 유지
+  // 최근 10개만 API에 전송 (토큰 절약)
+  const recentHistory = chatHistory.slice(-10);
+
+  const trimmedHistory = recentHistory.map((msg, idx) => {
+    if(idx === recentHistory.length - 1) return msg; // 마지막(현재) 메시지는 이미지 유지
     if(Array.isArray(msg.content)){
       const textOnly = msg.content.filter(c=>c.type==='text');
       // 텍스트 없어도 메시지 순서 유지 (빈 텍스트로 대체)
       if(!textOnly.length) return {...msg, content:[{type:'text',text:'(이미지)'}]};
       return {...msg, content: textOnly};
     }
+    // content가 string이면 배열로 변환
+    if(typeof msg.content === 'string') {
+      return {...msg, content:[{type:'text',text:msg.content}]};
+    }
     return msg;
-  });
+  }).filter(msg => msg && msg.role && msg.content);
+
+  // user/assistant 교대 검증 — 깨지면 마지막 메시지만 전송
+  let validHistory = trimmedHistory;
+  for(let i=1; i<trimmedHistory.length; i++){
+    if(trimmedHistory[i].role === trimmedHistory[i-1].role) {
+      validHistory = [trimmedHistory[trimmedHistory.length - 1]];
+      // chatHistory도 정리
+      chatHistory = chatHistory.slice(-1);
+      saveChatHistory();
+      break;
+    }
+  }
+  // 첫 메시지가 assistant면 제거
+  if(validHistory.length && validHistory[0].role === 'assistant') {
+    validHistory = validHistory.slice(1);
+  }
 
   try {
     const res=await fetch('https://misty-truth-3915.j89275520.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:8192,system:fullSystemPrompt,messages:trimmedHistory})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:8192,system:fullSystemPrompt,messages:validHistory})
     });
     
     // JSON 파싱 실패 대비
@@ -1156,6 +1249,14 @@ function importData() {
 }
 function resetPortfolio(){ if(!confirm('포트폴리오를 초기화할까요?'))return; portfolio=JSON.parse(JSON.stringify(DEFAULT_PORTFOLIO)); savePortfolio(); renderPortfolio(); alert('초기화 완료'); }
 function resetTrades(){ if(!confirm('매매기록을 초기화할까요?'))return; trades=[]; saveTrades(); renderTrades(); alert('초기화 완료'); }
+function resetChat(){
+  if(!confirm('채팅 기록을 초기화할까요?\n(포트폴리오·매매기록은 유지됩니다)'))return;
+  chatHistory=[];
+  localStorage.removeItem('v2_chat_history');
+  localStorage.removeItem('v2_chat_ui');
+  document.getElementById('chatMsgs').innerHTML='';
+  alert('채팅 초기화 완료');
+}
 
 function detectPlatform() {
   const ua=navigator.userAgent;
@@ -1175,14 +1276,6 @@ window.onload=()=>{
   const key=localStorage.getItem('v2_api_key');
   if(key){ document.getElementById('apiKeyInput').value=key; setStatus('apiStatus','✅ API 키 등록됨','ok'); }
   loadChatMessages();
-
-  // 스크롤 버튼 표시/숨김
-  const msgs=document.getElementById('chatMsgs');
-  const btn=document.getElementById('scrollBtn');
-  msgs.addEventListener('scroll',()=>{
-    const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
-    btn.style.display = atBottom ? 'none' : 'block';
-  });
 };
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
