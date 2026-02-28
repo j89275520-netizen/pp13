@@ -389,19 +389,27 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
     <div class="divider"></div>
 
     <div class="s-section">
-      <div class="s-title">📋 DB 붙여넣기 (Claude 대화에서 복사)</div>
-      <div class="s-desc">Claude에서 출력한 JSON을 복사해서 각각 붙여넣기하면 해당 DB만 교체됩니다.<br>다른 데이터는 건드리지 않습니다.</div>
+      <div class="s-title">📋 DB 업데이트 (붙여넣기 또는 파일 첨부)</div>
+      <div class="s-desc">Claude에서 출력한 JSON을 붙여넣거나, .json 파일을 첨부하세요.<br>다른 데이터는 건드리지 않습니다.</div>
       
       <div class="s-label">포트폴리오 JSON</div>
       <textarea class="s-textarea" id="pastePortfolio" style="min-height:100px;" placeholder='{"us":[...],"kr":[...]} 형식의 JSON 붙여넣기'></textarea>
-      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyPortfolio()">포트폴리오 적용</button>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="s-btn" style="flex:1;margin:0;" onclick="pasteApplyPortfolio()">적용</button>
+        <button class="s-btn dim" style="flex:1;margin:0;" onclick="document.getElementById('filePortfolio').click()">📎 파일</button>
+      </div>
+      <input type="file" id="filePortfolio" accept=".json" style="display:none" onchange="loadJsonFile(event,'portfolio')">
       <button class="s-btn red" id="portfolioUndoBtn" style="margin-top:6px;display:none;" onclick="undoPortfolio()">↩️ 되돌리기</button>
       <div class="s-status" id="pastePortfolioStatus"></div>
 
       <div class="s-label" style="margin-top:14px;">매매기록 JSON</div>
       <textarea class="s-textarea" id="pasteTrades" style="min-height:100px;" placeholder='[{"sym":"DFEN",...},...] 형식의 JSON 붙여넣기'></textarea>
-      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyTrades()">매매기록 전체교체</button>
-      <button class="s-btn dim" style="margin-top:6px;" onclick="pasteAppendTrades()">매매기록 추가 (기존 유지)</button>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="s-btn" style="flex:1;margin:0;" onclick="pasteApplyTrades()">전체교체</button>
+        <button class="s-btn dim" style="flex:1;margin:0;" onclick="pasteAppendTrades()">추가</button>
+        <button class="s-btn dim" style="flex:1;margin:0;" onclick="document.getElementById('fileTrades').click()">📎 파일</button>
+      </div>
+      <input type="file" id="fileTrades" accept=".json" style="display:none" onchange="loadJsonFile(event,'trades')">
       <button class="s-btn red" id="tradesUndoBtn" style="margin-top:6px;display:none;" onclick="undoTrades()">↩️ 되돌리기</button>
       <div class="s-status" id="pasteTradesStatus"></div>
 
@@ -1438,6 +1446,26 @@ function pasteApplyRules(){
   document.getElementById('rulesEditor').value=raw;
   document.getElementById('pasteRules').value='';
   setStatus('pasteRulesStatus','✅ 운영규칙 적용 완료','ok');
+}
+
+// ── JSON 파일 첨부 ──
+function loadJsonFile(e, type){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const text=ev.target.result;
+    if(type==='portfolio'){
+      document.getElementById('pastePortfolio').value=text;
+      pasteApplyPortfolio();
+    } else if(type==='trades'){
+      document.getElementById('pasteTrades').value=text;
+      // 파일 첨부는 추가 모드로 동작
+      pasteAppendTrades();
+    }
+  };
+  reader.readAsText(file);
+  e.target.value='';
 }
 
 function detectPlatform() {
