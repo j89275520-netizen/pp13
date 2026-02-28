@@ -395,11 +395,14 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <div class="s-label">포트폴리오 JSON</div>
       <textarea class="s-textarea" id="pastePortfolio" style="min-height:100px;" placeholder='{"us":[...],"kr":[...]} 형식의 JSON 붙여넣기'></textarea>
       <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyPortfolio()">포트폴리오 적용</button>
+      <button class="s-btn red" id="portfolioUndoBtn" style="margin-top:6px;display:none;" onclick="undoPortfolio()">↩️ 되돌리기</button>
       <div class="s-status" id="pastePortfolioStatus"></div>
 
       <div class="s-label" style="margin-top:14px;">매매기록 JSON</div>
       <textarea class="s-textarea" id="pasteTrades" style="min-height:100px;" placeholder='[{"sym":"DFEN",...},...] 형식의 JSON 붙여넣기'></textarea>
-      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyTrades()">매매기록 적용</button>
+      <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyTrades()">매매기록 전체교체</button>
+      <button class="s-btn dim" style="margin-top:6px;" onclick="pasteAppendTrades()">매매기록 추가 (기존 유지)</button>
+      <button class="s-btn red" id="tradesUndoBtn" style="margin-top:6px;display:none;" onclick="undoTrades()">↩️ 되돌리기</button>
       <div class="s-status" id="pasteTradesStatus"></div>
 
       <div class="s-label" style="margin-top:14px;">운영규칙 텍스트</div>
@@ -1297,32 +1300,126 @@ function resetChat(){
 }
 
 // ── DB 붙여넣기 ──
+let _tradesBackup=null;
+let _portfolioBackup=null;
+
 function pasteApplyPortfolio(){
   const raw=document.getElementById('pastePortfolio').value.trim();
   if(!raw){ setStatus('pastePortfolioStatus','❌ 내용을 붙여넣어주세요','err'); return; }
   try{
     const obj=JSON.parse(raw);
     if(!obj.us||!obj.kr) throw new Error('us/kr 필드 없음');
+    if(!confirm('⚠️ 포트폴리오를 전체 교체합니다. 계속할까요?')) return;
+    _portfolioBackup=loadPortfolio();
     portfolio=obj;
     savePortfolio();
     renderPortfolio();
     document.getElementById('pastePortfolio').value='';
     setStatus('pastePortfolioStatus','✅ 포트폴리오 적용 완료 (매매기록 유지)','ok');
+    document.getElementById('portfolioUndoBtn').style.display='inline-block';
   }catch(e){
     setStatus('pastePortfolioStatus','❌ JSON 파싱 오류: '+e.message,'err');
   }
 }
+function undoPortfolio(){
+  if(!_portfolioBackup) return;
+  portfolio=_portfolioBackup;
+  savePortfolio();
+  renderPortfolio();
+  _portfolioBackup=null;
+  document.getElementById('portfolioUndoBtn').style.display='none';
+  setStatus('pastePortfolioStatus','↩️ 포트폴리오 되돌리기 완료','ok');
+}
+
 function pasteApplyTrades(){
   const raw=document.getElementById('pasteTrades').value.trim();
   if(!raw){ setStatus('pasteTradesStatus','❌ 내용을 붙여넣어주세요','err'); return; }
   try{
     const arr=JSON.parse(raw);
     if(!Array.isArray(arr)) throw new Error('배열 형식이 아님');
+    const oldCount=loadTrades().length;
+    if(!confirm('⚠️ 전체교체: 기존 '+oldCount+'건 → 새 '+arr.length+'건으로 교체합니다.\n기존 기록이 모두 사라집니다. 계속할까요?')) return;
+    _tradesBackup=loadTrades();
     trades=arr;
     saveTrades();
     renderTrades();
     document.getElementById('pasteTrades').value='';
-    setStatus('pasteTradesStatus','✅ 매매기록 적용 완료 (포트폴리오 유지)','ok');
+    setStatus('pasteTradesStatus','✅ 전체교체 완료 ('+arr.length+'건)','ok');
+    document.getElementById('tradesUndoBtn').style.display='inline-block';
+  }catch(e){
+    setStatus('pasteTradesStatus','❌ JSON 파싱 오류: '+e.message,'err');
+  }
+}
+function undoTrades(){
+  if(!_tradesBackup) return;
+  trades=_tradesBackup;
+  saveTrades();
+  renderTrades();
+  _tradesBackup=null;
+  document.getElementById('tradesUndoBtn').style.display='none';
+  setStatus('pasteTradesStatus','↩️ 되돌리기 완료 ('+trades.length+'건 복원)','ok');
+}
+function pasteAppendTrades(){
+  const raw=document.getElementById('pasteTrades').value.trim();
+  if(!raw){ setStatus('pasteTradesStatus','❌ 내용을 붙여넣어주세요','err'); return; }
+  try{
+    const newArr=JSON.parse(raw);
+    if(!Array.isArray(newArr)) throw new Error('배열 형식이 아님');
+    const existing=loadTrades();
+    
+    const duplicates=[];
+    const conflicts=[];
+    const clean=[];
+    
+    newArr.forEach(nw=>{
+      const match=existing.find(ex=>ex.sym===nw.sym && ex.entryDate===nw.entryDate && ex.qty===nw.qty);
+      if(match){
+        // 같은 종목+진입일+수량인데 가격이 다르면 상반
+        if(match.entryPrice!==nw.entryPrice || match.exitPrice!==nw.exitPrice){
+          conflicts.push({existing:match, incoming:nw});
+        } else {
+          duplicates.push(nw);
+        }
+      } else {
+        clean.push(nw);
+      }
+    });
+    
+    // 상반 있으면 중단 + 상세 표시
+    if(conflicts.length){
+      let msg='⚠️ 상반되는 기록 '+conflicts.length+'건 발견. 추가 중단.\n\n';
+      conflicts.forEach(c=>{
+        msg+=c.existing.sym+' '+c.existing.entryDate+':\n';
+        msg+='  기존: 진입 '+c.existing.entryPrice;
+        if(c.existing.exitPrice) msg+=' / 청산 '+c.existing.exitPrice;
+        msg+='\n  새것: 진입 '+c.incoming.entryPrice;
+        if(c.incoming.exitPrice) msg+=' / 청산 '+c.incoming.exitPrice;
+        msg+='\n\n';
+      });
+      msg+='Claude에서 수정된 JSON을 받아 다시 시도하세요.';
+      alert(msg);
+      setStatus('pasteTradesStatus','❌ 상반 '+conflicts.length+'건 → 추가 중단','err');
+      return;
+    }
+    
+    // 중복 있으면 알림
+    if(duplicates.length){
+      if(!confirm('중복 '+duplicates.length+'건 발견 (건너뜁니다).\n새 기록 '+clean.length+'건만 추가합니다.\n계속할까요?')) return;
+    }
+    
+    if(!clean.length){
+      setStatus('pasteTradesStatus','ℹ️ 추가할 새 기록이 없습니다 (전부 중복)','ok');
+      return;
+    }
+    
+    trades=existing;
+    trades.push(...clean);
+    saveTrades();
+    renderTrades();
+    document.getElementById('pasteTrades').value='';
+    let msg='✅ '+clean.length+'건 추가 완료 (총 '+trades.length+'건)';
+    if(duplicates.length) msg+=' / 중복 '+duplicates.length+'건 건너뜀';
+    setStatus('pasteTradesStatus',msg,'ok');
   }catch(e){
     setStatus('pasteTradesStatus','❌ JSON 파싱 오류: '+e.message,'err');
   }
