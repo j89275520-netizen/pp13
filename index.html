@@ -1380,16 +1380,28 @@ function pasteAppendTrades(){
     const clean=[];
     let memoUpdated=0;
     
+    let exitUpdated=0;
+    
     newArr.forEach(nw=>{
       const match=existing.find(ex=>ex.sym===nw.sym && ex.entryDate===nw.entryDate && ex.qty===nw.qty);
       if(match){
-        // 같은 종목+진입일+수량인데 가격이 다르면 상반
-        if(match.entryPrice!==nw.entryPrice || match.exitPrice!==nw.exitPrice){
+        const idx=existing.indexOf(match);
+        // 진입가가 다르면 진짜 상반
+        if(nw.entryPrice && match.entryPrice!==nw.entryPrice){
           conflicts.push({existing:match, incoming:nw});
+        // 둘 다 청산가 있는데 다르면 상반
+        } else if(match.exitPrice && nw.exitPrice && match.exitPrice!==nw.exitPrice){
+          conflicts.push({existing:match, incoming:nw});
+        // 기존에 청산 없고 새것에 청산 있으면 → 청산 업데이트
+        } else if(!match.exitPrice && nw.exitPrice){
+          if(idx!==-1){
+            Object.assign(existing[idx], nw);
+            exitUpdated++;
+          }
+          duplicates.push(nw);
         } else {
           // 중복이지만 memo가 있으면 기존 메모에 이어붙이기
           if(nw.memo){
-            const idx=existing.indexOf(match);
             if(idx!==-1){
               existing[idx].memo = match.memo ? match.memo+' / '+nw.memo : nw.memo;
               memoUpdated++;
@@ -1424,7 +1436,7 @@ function pasteAppendTrades(){
       if(!confirm('중복 '+duplicates.length+'건 발견 (건너뜁니다).\n새 기록 '+clean.length+'건만 추가합니다.\n계속할까요?')) return;
     }
     
-    if(!clean.length && !memoUpdated){
+    if(!clean.length && !memoUpdated && !exitUpdated){
       setStatus('pasteTradesStatus','ℹ️ 추가할 새 기록이 없습니다 (전부 중복)','ok');
       return;
     }
@@ -1435,7 +1447,8 @@ function pasteAppendTrades(){
     renderTrades();
     document.getElementById('pasteTrades').value='';
     let msg='✅ '+clean.length+'건 추가 완료 (총 '+trades.length+'건)';
-    if(duplicates.length) msg+=' / 중복 '+duplicates.length+'건 건너뜀';
+    if(duplicates.length) msg+=' / 중복 '+(duplicates.length-exitUpdated-memoUpdated)+'건 건너뜀';
+    if(exitUpdated) msg+=' / 청산 '+exitUpdated+'건 업데이트';
     if(memoUpdated) msg+=' / 메모 '+memoUpdated+'건 업데이트';
     setStatus('pasteTradesStatus',msg,'ok');
   }catch(e){
