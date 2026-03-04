@@ -1,4 +1,4 @@
-const CACHE = 'trading-pwa-v10';
+const CACHE = 'trading-pwa-v11';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {

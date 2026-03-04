@@ -756,9 +756,9 @@ function renderMarket(label, tickers, kr) {
       h+=`<div class="lot-row">
         <div class="lot-top">
           <div class="lot-meta">
-            <span class="lot-id">Lot${lot.id}/${lot.qty}주</span>
+            <span class="lot-id">${String(lot.id).startsWith('Lot')?'':'Lot'}${lot.id}/${lot.qty}주</span>
             ${lot.star?`<span class="tag star">★${lot.note||''}</span>`:''}
-            <span class="tag">${lot.tag}</span>
+            ${lot.tag?`<span class="tag">${lot.tag}</span>`:''}
             ${lot.entryGap?`<span class="tag yellow">괴리율${lot.entryGap}</span>`:''}
           </div>
           <div class="lot-pnl ${pc2}">${p>0?'+':''}${p.toFixed(2)}%</div>
@@ -1378,6 +1378,7 @@ function pasteAppendTrades(){
     const duplicates=[];
     const conflicts=[];
     const clean=[];
+    let memoUpdated=0;
     
     newArr.forEach(nw=>{
       const match=existing.find(ex=>ex.sym===nw.sym && ex.entryDate===nw.entryDate && ex.qty===nw.qty);
@@ -1386,6 +1387,14 @@ function pasteAppendTrades(){
         if(match.entryPrice!==nw.entryPrice || match.exitPrice!==nw.exitPrice){
           conflicts.push({existing:match, incoming:nw});
         } else {
+          // 중복이지만 memo가 있으면 기존 메모에 이어붙이기
+          if(nw.memo){
+            const idx=existing.indexOf(match);
+            if(idx!==-1){
+              existing[idx].memo = match.memo ? match.memo+' / '+nw.memo : nw.memo;
+              memoUpdated++;
+            }
+          }
           duplicates.push(nw);
         }
       } else {
@@ -1415,7 +1424,7 @@ function pasteAppendTrades(){
       if(!confirm('중복 '+duplicates.length+'건 발견 (건너뜁니다).\n새 기록 '+clean.length+'건만 추가합니다.\n계속할까요?')) return;
     }
     
-    if(!clean.length){
+    if(!clean.length && !memoUpdated){
       setStatus('pasteTradesStatus','ℹ️ 추가할 새 기록이 없습니다 (전부 중복)','ok');
       return;
     }
@@ -1427,6 +1436,7 @@ function pasteAppendTrades(){
     document.getElementById('pasteTrades').value='';
     let msg='✅ '+clean.length+'건 추가 완료 (총 '+trades.length+'건)';
     if(duplicates.length) msg+=' / 중복 '+duplicates.length+'건 건너뜀';
+    if(memoUpdated) msg+=' / 메모 '+memoUpdated+'건 업데이트';
     setStatus('pasteTradesStatus',msg,'ok');
   }catch(e){
     setStatus('pasteTradesStatus','❌ JSON 파싱 오류: '+e.message,'err');
