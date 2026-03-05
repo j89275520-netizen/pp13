@@ -1382,30 +1382,37 @@ function pasteAppendTrades(){
     
     let exitUpdated=0;
     
+    // 숫자 비교 헬퍼 (string/number 혼용 방지, 소수점 2자리 기준)
+    const numEq=(a,b)=>Math.round(Number(a)*100)===Math.round(Number(b)*100);
+
     newArr.forEach(nw=>{
-      const match=existing.find(ex=>ex.sym===nw.sym && ex.entryDate===nw.entryDate && ex.qty===nw.qty);
+      // qty도 숫자 비교, entryDate null/undefined 통일
+      const match=existing.find(ex=>
+        ex.sym===nw.sym &&
+        (ex.entryDate??null)===(nw.entryDate??null) &&
+        Number(ex.qty)===Number(nw.qty)
+      );
       if(match){
         const idx=existing.indexOf(match);
-        // 진입가가 다르면 진짜 상반
-        if(nw.entryPrice && match.entryPrice!==nw.entryPrice){
+        const matchHasExit=!!(match.exitPrice||match.exitPrice===0);
+        const newHasExit=!!(nw.exitPrice||nw.exitPrice===0);
+
+        // 진입가가 다르면 진짜 상반 (숫자 비교)
+        if(nw.entryPrice && !numEq(match.entryPrice, nw.entryPrice)){
           conflicts.push({existing:match, incoming:nw});
-        // 둘 다 청산가 있는데 다르면 상반
-        } else if(match.exitPrice && nw.exitPrice && match.exitPrice!==nw.exitPrice){
+        // 둘 다 청산가 있는데 다르면 상반 (숫자 비교)
+        } else if(matchHasExit && newHasExit && !numEq(match.exitPrice, nw.exitPrice)){
           conflicts.push({existing:match, incoming:nw});
-        // 기존에 청산 없고 새것에 청산 있으면 → 청산 업데이트
-        } else if(!match.exitPrice && nw.exitPrice){
-          if(idx!==-1){
-            Object.assign(existing[idx], nw);
-            exitUpdated++;
-          }
+        // 기존에 청산 없고 새것에 청산 있으면 → 청산 업데이트 (핵심 수정)
+        } else if(!matchHasExit && newHasExit){
+          Object.assign(existing[idx], nw);
+          exitUpdated++;
           duplicates.push(nw);
         } else {
-          // 중복이지만 memo가 있으면 기존 메모에 이어붙이기
+          // 완전 중복 - memo만 병합
           if(nw.memo){
-            if(idx!==-1){
-              existing[idx].memo = match.memo ? match.memo+' / '+nw.memo : nw.memo;
-              memoUpdated++;
-            }
+            existing[idx].memo = match.memo ? match.memo+' / '+nw.memo : nw.memo;
+            memoUpdated++;
           }
           duplicates.push(nw);
         }
