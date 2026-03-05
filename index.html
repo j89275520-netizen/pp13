@@ -1583,7 +1583,12 @@ function pasteAppendTrades(){
     let memoUpdated=0;
 
     newArr.forEach(nw=>{
-      const isExitRecord = !!(nw.exitQty || nw.exitPrice);
+      // 완성된 flat 기록(진입+청산 세트) vs 순수 청산 추가 구분
+      // exitQty 있으면 → 순수 청산 추가
+      // exitPrice 있지만 entryPrice+qty도 있으면 → 완성된 flat 기록 (진입으로 처리)
+      const isPureExit = !!(nw.exitQty);
+      const isCompleteFlat = !nw.exitQty && !!(nw.exitPrice) && !!(nw.entryPrice) && !!(nw.qty);
+      const isExitRecord = isPureExit; // 완성된 flat은 진입 기록으로 처리
 
       // ── 진입 기록 ──
       if(!isExitRecord){
