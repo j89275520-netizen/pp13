@@ -148,6 +148,32 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 }
 .type-손절 { background:rgba(255,68,102,.15); color:var(--red); border:1px solid var(--red); }
 .type-판단청산 { background:rgba(0,212,255,.1); color:var(--accent); border:1px solid var(--accent); }
+.type-익절 { background:rgba(0,255,136,.1); color:var(--green); border:1px solid var(--green); }
+.exit-section { border-top:1px solid var(--border); }
+.exit-row { padding:9px 14px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.15); }
+.exit-row:last-of-type { border-bottom:none; }
+.exit-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+.exit-label { font-family:var(--mono); font-size:10px; color:var(--text2); }
+.exit-pnl { font-family:var(--mono); font-size:13px; font-weight:700; }
+.exit-grid { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
+.remain-row { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-top:1px solid var(--border); }
+.remain-badge { font-family:var(--mono); font-size:11px; padding:3px 10px; border-radius:8px; }
+.remain-open { background:rgba(0,212,255,.1); color:var(--accent); border:1px solid var(--accent); }
+.remain-done { background:rgba(136,136,170,.1); color:var(--text2); border:1px solid var(--border); }
+.exit-add-btn { font-family:var(--sans); font-size:11px; background:var(--accent2); color:white; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; }
+.exit-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:500; display:flex; align-items:flex-end; }
+.exit-modal { background:var(--bg2); border:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px 16px; width:100%; }
+.exit-modal-title { font-family:var(--mono); font-size:13px; color:var(--accent); margin-bottom:14px; }
+.exit-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.em-group { display:flex; flex-direction:column; gap:4px; }
+.em-label { font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:.05em; }
+.em-input { background:var(--bg3); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; padding:9px 11px; border-radius:8px; outline:none; width:100%; }
+.em-input:focus { border-color:var(--accent); }
+.em-select { background:var(--bg3); border:1px solid var(--border); color:var(--text); font-family:var(--sans); font-size:13px; padding:9px 11px; border-radius:8px; outline:none; width:100%; }
+.exit-modal-btns { display:flex; gap:8px; }
+.em-btn { flex:1; padding:13px; border:none; border-radius:10px; font-size:14px; font-weight:700; font-family:var(--sans); cursor:pointer; }
+.em-btn.confirm { background:var(--accent); color:var(--bg); }
+.em-btn.cancel { background:var(--bg3); color:var(--text2); border:1px solid var(--border); }
 
 /* ── STATS PAGE ── */
 .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
@@ -326,6 +352,8 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 <div class="page" id="page-trades">
   <div class="filter-row" id="tradeFilters">
     <button class="filter-btn active" onclick="filterTrades('전체',this)">전체</button>
+    <button class="filter-btn" onclick="filterTrades('진행중',this)">진행중</button>
+    <button class="filter-btn" onclick="filterTrades('완료',this)">완료</button>
     <button class="filter-btn" onclick="filterTrades('손절',this)">손절</button>
     <button class="filter-btn" onclick="filterTrades('판단청산',this)">판단청산</button>
     <button class="filter-btn" onclick="filterTrades('US',this)">US</button>
@@ -437,6 +465,43 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <button class="s-btn red" style="margin-top:6px;" onclick="resetChat()">채팅 기록 초기화</button>
     </div>
 
+  </div>
+</div>
+
+<!-- EXIT MODAL -->
+<div class="exit-modal-overlay" id="exitModal" style="display:none;">
+  <div class="exit-modal">
+    <div class="exit-modal-title">🔖 청산 추가</div>
+    <div class="exit-modal-grid">
+      <div class="em-group">
+        <div class="em-label">청산수량</div>
+        <input type="number" class="em-input" id="emQty" placeholder="0">
+      </div>
+      <div class="em-group">
+        <div class="em-label">청산가</div>
+        <input type="number" class="em-input" id="emPrice" placeholder="0" step="0.01">
+      </div>
+      <div class="em-group">
+        <div class="em-label">청산일</div>
+        <input type="date" class="em-input" id="emDate">
+      </div>
+      <div class="em-group">
+        <div class="em-label">청산유형</div>
+        <select class="em-select" id="emType">
+          <option value="판단청산">판단청산</option>
+          <option value="손절">손절</option>
+          <option value="익절">익절</option>
+        </select>
+      </div>
+    </div>
+    <div class="em-group" style="margin-bottom:14px;">
+      <div class="em-label">메모 (선택)</div>
+      <input type="text" class="em-input" id="emMemo" placeholder="">
+    </div>
+    <div class="exit-modal-btns">
+      <button class="em-btn cancel" onclick="closeExitModal()">취소</button>
+      <button class="em-btn confirm" onclick="confirmExit()">저장</button>
+    </div>
   </div>
 </div>
 
@@ -780,6 +845,60 @@ function renderMarket(label, tickers, kr) {
 function toggleCard(hdr) { hdr.parentElement.classList.toggle('open'); }
 
 // ═══════════════════════════════════════════════
+// TRADING DAY CALCULATOR
+// ═══════════════════════════════════════════════
+const _US_HOL = new Set([
+  '2025-01-01','2025-01-20','2025-02-17','2025-04-18','2025-05-26','2025-07-04','2025-09-01','2025-11-27','2025-12-25',
+  '2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25','2026-07-03','2026-09-07','2026-11-26','2026-12-25',
+  '2027-01-01','2027-01-18','2027-02-15','2027-04-02','2027-05-31','2027-07-05','2027-09-06','2027-11-25','2027-12-24',
+  '2028-01-17','2028-02-21','2028-04-14','2028-05-29','2028-07-04','2028-09-04','2028-11-23','2028-12-25',
+  '2029-01-01','2029-01-15','2029-02-19','2029-03-30','2029-05-28','2029-07-04','2029-09-03','2029-11-22','2029-12-25',
+  '2030-01-01','2030-01-21','2030-02-18','2030-04-19','2030-05-27','2030-07-04','2030-09-02','2030-11-28','2030-12-25'
+]);
+const _KR_HOL = new Set([
+  '2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-06','2025-10-07','2025-10-08','2025-10-09','2025-12-25',
+  '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-02','2026-05-05','2026-05-25','2026-06-06','2026-08-17','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25',
+  '2027-01-01','2027-01-27','2027-01-28','2027-01-29','2027-03-01','2027-05-05','2027-06-06','2027-08-16','2027-09-15','2027-09-16','2027-09-17','2027-10-04','2027-10-09','2027-12-25',
+  '2028-01-01','2028-02-14','2028-02-15','2028-02-16','2028-03-01','2028-05-05','2028-06-06','2028-08-15','2028-09-28','2028-09-29','2028-09-30','2028-10-03','2028-10-09','2028-12-25',
+  '2029-01-01','2029-02-04','2029-02-05','2029-02-06','2029-03-01','2029-05-05','2029-06-06','2029-08-15','2029-09-17','2029-09-18','2029-09-19','2029-10-03','2029-10-09','2029-12-25',
+  '2030-01-01','2030-01-23','2030-01-24','2030-01-25','2030-03-01','2030-05-06','2030-06-06','2030-08-15','2030-10-03','2030-10-07','2030-10-08','2030-10-09','2030-12-25'
+]);
+function calcTradingDays(entryStr, exitStr, market) {
+  if(!entryStr||!exitStr) return null;
+  try {
+    const hols = market==='KR' ? _KR_HOL : _US_HOL;
+    let d = new Date(entryStr+'T00:00:00'); d.setDate(d.getDate()+1);
+    const end = new Date(exitStr+'T00:00:00');
+    let cnt=0;
+    while(d<=end){ const dow=d.getDay(), ds=d.toISOString().slice(0,10); if(dow!==0&&dow!==6&&!hols.has(ds)) cnt++; d.setDate(d.getDate()+1); }
+    return Math.max(1,cnt);
+  } catch(e){ return null; }
+}
+
+// ═══════════════════════════════════════════════
+// MIGRATION: flat → exits[] structure
+// ═══════════════════════════════════════════════
+function migrateTrade(t) {
+  if(t.exits !== undefined) return t;
+  const rec = {
+    sym:t.sym, market:t.market, tag:t.tag||null,
+    lotId:t.lotId||null, entryDate:t.entryDate||null,
+    entryPrice:t.entryPrice, qty:Number(t.qty),
+    entryGap:t.entryGap||null, stopDist:t.stopDist||null,
+    weight:t.weight||t.posSize||null, memo:t.memo||'',
+    exits:[], remainQty:Number(t.qty)
+  };
+  if(t.exitPrice||t.exitDate) {
+    const hd = calcTradingDays(t.entryDate,t.exitDate,t.market) || t.holdDays || null;
+    const pnl = t.pnl!=null?t.pnl:(t.returnPct!=null?t.returnPct:null);
+    rec.exits=[{ exitDate:t.exitDate||null, exitQty:Number(t.qty), exitPrice:t.exitPrice,
+      pnl:pnl, holdDays:hd, rVal:t.rVal||null, type:t.type||t.exitType||null, memo:'' }];
+    rec.remainQty=0;
+  }
+  return rec;
+}
+
+// ═══════════════════════════════════════════════
 // TRADE LOG RENDER
 // ═══════════════════════════════════════════════
 function filterTrades(f, btn) {
@@ -790,49 +909,85 @@ function filterTrades(f, btn) {
 }
 
 function renderTrades() {
-  let filtered = trades;
-  if(tradeFilter==='손절') filtered=trades.filter(t=>t.type==='손절');
-  else if(tradeFilter==='판단청산') filtered=trades.filter(t=>t.type==='판단청산');
-  else if(tradeFilter==='US') filtered=trades.filter(t=>t.market==='US');
-  else if(tradeFilter==='KR') filtered=trades.filter(t=>t.market==='KR');
+  const allMig = trades.map(migrateTrade);
+
+  let filtered = allMig;
+  if(tradeFilter==='진행중') filtered=allMig.filter(t=>t.remainQty>0);
+  else if(tradeFilter==='완료') filtered=allMig.filter(t=>t.remainQty<=0);
+  else if(tradeFilter==='손절') filtered=allMig.filter(t=>t.exits.some(e=>e.type==='손절'));
+  else if(tradeFilter==='판단청산') filtered=allMig.filter(t=>t.exits.some(e=>e.type==='판단청산'));
+  else if(tradeFilter==='US') filtered=allMig.filter(t=>t.market==='US');
+  else if(tradeFilter==='KR') filtered=allMig.filter(t=>t.market==='KR');
 
   if(!filtered.length) {
-    document.getElementById('tradeList').innerHTML=`<div class="msg system" style="margin-top:40px;display:block;text-align:center;">매매기록 없음<br>업데이트 탭에서 청산 내역을 추가하세요</div>`;
+    document.getElementById('tradeList').innerHTML=`<div class="msg system" style="margin-top:40px;display:block;text-align:center;">매매기록 없음</div>`;
     return;
   }
+
+  const isKrFn = t=>t.market==='KR';
+  const fmtV = (v,isKr)=>v==null?'-':(isKr?Number(v).toLocaleString('ko-KR'):Number(v).toFixed(2));
 
   const sorted=[...filtered].reverse();
   let h='';
   sorted.forEach((t,i)=>{
-    const pnl=parseFloat(t.pnl||0);
-    const pc=pnl>0?'pos':pnl<0?'neg':'neu';
-    const sign=pnl>0?'+':'';
+    const tradeNo = allMig.indexOf(t)+1;
+    const isKr = isKrFn(t);
+    const isOpen = t.remainQty>0;
+    const rawIdx = trades.indexOf(trades.find((_,ri)=>ri===allMig.indexOf(t)));
+
+    let sumPnl=null;
+    if(t.exits.length){
+      const tq=t.exits.reduce((a,e)=>a+Number(e.exitQty||0),0);
+      const wp=t.exits.reduce((a,e)=>a+(parseFloat(e.pnl||0)*Number(e.exitQty||0)),0);
+      sumPnl=tq?wp/tq:null;
+    }
+    const pc=sumPnl==null?'neu':sumPnl>0?'pos':sumPnl<0?'neg':'neu';
+    const sign=sumPnl>0?'+':'';
+
     h+=`<div class="trade-card" id="trd${i}">
       <div class="trade-header" onclick="toggleTrade(this)">
         <div>
-          <div class="trade-sym">${t.sym}</div>
-          <div class="trade-date">${t.exitDate||''} · ${t.tag||''}</div>
+          <div class="trade-sym"><span style="font-size:10px;color:var(--text2);font-family:var(--mono);margin-right:5px;">#${tradeNo}</span>${t.sym}${t.lotId?`<span style="font-size:10px;color:var(--text2);margin-left:5px;">${t.lotId}</span>`:''}
+          </div>
+          <div class="trade-date">${t.entryDate||'-'} · ${t.tag||''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <div class="trade-pnl ${pc}">${sign}${pnl.toFixed(2)}%</div>
+          <span class="remain-badge ${isOpen?'remain-open':'remain-done'}">${isOpen?t.remainQty+'주':'완료'}</span>
+          ${sumPnl!=null?`<div class="trade-pnl ${pc}">${sign}${sumPnl.toFixed(2)}%</div>`:''}
           <div class="chevron">▼</div>
         </div>
       </div>
       <div class="trade-body">
-        <div class="trade-grid">
+        <div class="trade-grid" style="margin-bottom:8px;">
           <div class="lot-item"><span class="li-label">진입일</span><span class="li-val">${t.entryDate||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">청산일</span><span class="li-val">${t.exitDate||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">진입가</span><span class="li-val">${t.entryPrice||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">청산가</span><span class="li-val">${t.exitPrice||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">수량</span><span class="li-val">${t.qty||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">보유일수</span><span class="li-val">${t.holdDays||'-'}일</span></div>
-          <div class="lot-item"><span class="li-label">진입괴리율</span><span class="li-val">${t.entryGap||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">손절거리</span><span class="li-val">${t.stopDist||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">진입비중</span><span class="li-val">${t.weight||'-'}</span></div>
-          <div class="lot-item"><span class="li-label">R값</span><span class="li-val ${pc}">${t.rVal||'-'}</span></div>
+          <div class="lot-item"><span class="li-label">진입가</span><span class="li-val">${fmtV(t.entryPrice,isKr)}</span></div>
+          <div class="lot-item"><span class="li-label">수량</span><span class="li-val">${t.qty}</span></div>
+          <div class="lot-item"><span class="li-label">잔여</span><span class="li-val ${isOpen?'pos':'neu'}">${t.remainQty}주</span></div>
+          ${t.entryGap?`<div class="lot-item"><span class="li-label">진입괴리율</span><span class="li-val">${t.entryGap}</span></div>`:''}
+          ${t.stopDist?`<div class="lot-item"><span class="li-label">손절거리</span><span class="li-val">${t.stopDist}</span></div>`:''}
+          ${t.weight?`<div class="lot-item"><span class="li-label">진입비중</span><span class="li-val">${t.weight}</span></div>`:''}
         </div>
-        <span class="trade-type-badge type-${t.type}">${t.type||''}</span>
-        ${t.memo?`<div style="margin-top:8px;font-size:11px;color:var(--text2);">${t.memo}</div>`:''}
+        ${t.memo?`<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">${t.memo}</div>`:''}
+        ${t.exits.length?`<div class="exit-section">`+t.exits.map((e,ei)=>{
+          const ep=parseFloat(e.pnl||0); const epc=ep>0?'pos':ep<0?'neg':'neu'; const es=ep>0?'+':'';
+          return `<div class="exit-row">
+            <div class="exit-top">
+              <span class="exit-label">${ei+1}차 청산 · ${e.exitDate||'-'} · ${e.holdDays!=null?e.holdDays+'일거래일':'-'}</span>
+              <span class="exit-pnl ${epc}">${es}${ep.toFixed(2)}%</span>
+            </div>
+            <div class="exit-grid">
+              <div class="lot-item"><span class="li-label">청산수량</span><span class="li-val">${e.exitQty}</span></div>
+              <div class="lot-item"><span class="li-label">청산가</span><span class="li-val">${fmtV(e.exitPrice,isKr)}</span></div>
+              ${e.rVal!=null?`<div class="lot-item"><span class="li-label">R값</span><span class="li-val ${epc}">${e.rVal}R</span></div>`:''}
+              ${e.type?`<div class="lot-item" style="padding-top:4px;"><span class="trade-type-badge type-${e.type}">${e.type}</span></div>`:''}
+            </div>
+            ${e.memo?`<div style="font-size:10px;color:var(--text2);margin-top:3px;">${e.memo}</div>`:''}
+          </div>`;
+        }).join('')+`</div>`:''}
+        <div class="remain-row">
+          <span class="remain-badge ${isOpen?'remain-open':'remain-done'}">${isOpen?`잔여 ${t.remainQty}주`:'전량 청산'}</span>
+          ${isOpen?`<button class="exit-add-btn" onclick="openExitModal(${allMig.indexOf(t)})">+ 청산 추가</button>`:''}
+        </div>
       </div>
     </div>`;
   });
@@ -842,30 +997,75 @@ function renderTrades() {
 function toggleTrade(hdr) { hdr.parentElement.classList.toggle('open'); }
 
 // ═══════════════════════════════════════════════
+// EXIT MODAL
+// ═══════════════════════════════════════════════
+let _exitTargetIdx = null;
+function openExitModal(migIdx) {
+  _exitTargetIdx = migIdx;
+  const t = migrateTrade(trades[migIdx]);
+  document.getElementById('emQty').value = t.remainQty;
+  document.getElementById('emPrice').value = '';
+  document.getElementById('emDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('emType').value = '판단청산';
+  document.getElementById('emMemo').value = '';
+  document.getElementById('exitModal').style.display='flex';
+}
+function closeExitModal() { document.getElementById('exitModal').style.display='none'; _exitTargetIdx=null; }
+function confirmExit() {
+  if(_exitTargetIdx===null) return;
+  const exitQty = parseInt(document.getElementById('emQty').value);
+  const exitPrice = parseFloat(document.getElementById('emPrice').value);
+  const exitDate = document.getElementById('emDate').value;
+  const type = document.getElementById('emType').value;
+  const memo = document.getElementById('emMemo').value.trim();
+  if(!exitQty||!exitPrice||!exitDate){ alert('수량, 청산가, 청산일은 필수입니다.'); return; }
+
+  const t = migrateTrade(trades[_exitTargetIdx]);
+  if(exitQty > t.remainQty){ alert(`잔여수량(${t.remainQty})보다 많습니다.`); return; }
+
+  const pnl = ((exitPrice - Number(t.entryPrice)) / Number(t.entryPrice) * 100);
+  const holdDays = calcTradingDays(t.entryDate, exitDate, t.market);
+  const stopDistNum = t.stopDist ? parseFloat(t.stopDist) : null;
+  const rVal = stopDistNum ? parseFloat((pnl / stopDistNum).toFixed(2)) : null;
+
+  t.exits.push({ exitDate, exitQty, exitPrice, pnl:parseFloat(pnl.toFixed(2)), holdDays, rVal, type, memo });
+  t.remainQty -= exitQty;
+  trades[_exitTargetIdx] = t;
+  saveTrades();
+  renderTrades();
+  closeExitModal();
+}
+
+// ═══════════════════════════════════════════════
 // STATS RENDER
 // ═══════════════════════════════════════════════
 function renderStats() {
   const el=document.getElementById('statsContent');
-  if(!trades.length) {
-    el.innerHTML=`<div class="msg system" style="margin-top:40px;display:block;text-align:center;">매매기록 없음<br>청산이 발생하면 통계가 표시됩니다</div>`;
+  // 모든 exits 수집
+  const allExits=[];
+  trades.map(migrateTrade).forEach(t=>{
+    t.exits.forEach(e=>allExits.push({...e, tag:t.tag, market:t.market}));
+  });
+  if(!allExits.length) {
+    el.innerHTML=`<div class="msg system" style="margin-top:40px;display:block;text-align:center;">청산 기록 없음<br>청산이 발생하면 통계가 표시됩니다</div>`;
     return;
   }
-
-  const total=trades.length;
-  const wins=trades.filter(t=>parseFloat(t.pnl||0)>0).length;
+  const total=allExits.length;
+  const wins=allExits.filter(e=>parseFloat(e.pnl||0)>0).length;
   const winRate=(wins/total*100).toFixed(1);
-  const avgPnl=(trades.reduce((a,t)=>a+parseFloat(t.pnl||0),0)/total).toFixed(2);
-  const avgR=(trades.filter(t=>t.rVal).reduce((a,t)=>a+parseFloat(t.rVal||0),0)/trades.filter(t=>t.rVal).length||0).toFixed(2);
-  const손절=trades.filter(t=>t.type==='손절').length;
-  const판단=trades.filter(t=>t.type==='판단청산').length;
+  const avgPnl=(allExits.reduce((a,e)=>a+parseFloat(e.pnl||0),0)/total).toFixed(2);
+  const rVals=allExits.filter(e=>e.rVal!=null);
+  const avgR=rVals.length?(rVals.reduce((a,e)=>a+parseFloat(e.rVal),0)/rVals.length).toFixed(2):'N/A';
+  const손절=allExits.filter(e=>e.type==='손절').length;
+  const판단=allExits.filter(e=>e.type==='판단청산').length;
+  const익절=allExits.filter(e=>e.type==='익절').length;
 
-  // by tag
-  const tags=[...new Set(trades.map(t=>t.tag).filter(Boolean))];
+  const tags=[...new Set(trades.map(t=>t.tag||migrateTrade(t).tag).filter(Boolean))];
   let tagRows='';
   tags.forEach(tag=>{
-    const arr=trades.filter(t=>t.tag===tag);
-    const wr=(arr.filter(t=>parseFloat(t.pnl||0)>0).length/arr.length*100).toFixed(0);
-    const ar=(arr.reduce((a,t)=>a+parseFloat(t.rVal||0),0)/arr.length).toFixed(2);
+    const arr=allExits.filter(e=>e.tag===tag);
+    if(!arr.length) return;
+    const wr=(arr.filter(e=>parseFloat(e.pnl||0)>0).length/arr.length*100).toFixed(0);
     tagRows+=`<div class="bar-row">
       <div class="bar-label" style="font-size:10px;">${tag}</div>
       <div class="bar-track"><div class="bar-fill ${parseFloat(wr)>=50?'green':'red'}" style="width:${wr}%"></div></div>
@@ -892,8 +1092,8 @@ function renderStats() {
       </div>
       <div class="stats-card">
         <div class="sc-title">판단청산</div>
-        <div class="sc-val pos">${판단}회</div>
-        <div class="sc-sub">${(판단/total*100).toFixed(0)}%</div>
+        <div class="sc-val pos">${판단}회 ${익절?`<span style="font-size:12px;">/ 익절 ${익절}</span>`:''}</div>
+        <div class="sc-sub">${((판단+익절)/total*100).toFixed(0)}%</div>
       </div>
       ${tagRows?`<div class="stats-card full">
         <div class="sc-title">진입방식별 승률</div>
@@ -1136,7 +1336,10 @@ ${loadRules()}
 ${JSON.stringify(portfolio)}
 
 ## 매매기록 항목 필드
-sym, market(US/KR), tag, entryDate, exitDate, entryPrice, exitPrice, qty, pnl(%), holdDays, entryGap, stopDist, weight, rVal, type(손절/판단청산), memo
+[진입 기록] sym, market(US/KR), tag, lotId, entryDate, entryPrice, qty, entryGap, stopDist, weight, memo
+[청산 추가] sym, lotId(있으면), entryDate, entryPrice, exitQty, exitPrice, exitDate, type(손절/판단청산/익절)
+- pnl/holdDays/rVal은 앱이 자동계산하므로 JSON에 포함 불필요
+- 부분청산: exitQty < qty 로 설정 (여러 번 나눠서 청산 가능)
 
 ## 응답 형식 (필수)
 변경사항 한 줄 설명 후 반드시 코드블럭 출력:
@@ -1373,90 +1576,95 @@ function pasteAppendTrades(){
   try{
     const newArr=JSON.parse(raw);
     if(!Array.isArray(newArr)) throw new Error('배열 형식이 아님');
-    const existing=loadTrades();
-    
-    const duplicates=[];
-    const conflicts=[];
-    const clean=[];
-    let memoUpdated=0;
-    
-    let exitUpdated=0;
-    
-    // 숫자 비교 헬퍼 (string/number 혼용 방지, 소수점 2자리 기준)
     const numEq=(a,b)=>Math.round(Number(a)*100)===Math.round(Number(b)*100);
 
-    newArr.forEach(nw=>{
-      // qty도 숫자 비교, entryDate null/undefined 통일
-      const match=existing.find(ex=>
-        ex.sym===nw.sym &&
-        (ex.entryDate??null)===(nw.entryDate??null) &&
-        Number(ex.qty)===Number(nw.qty)
-      );
-      if(match){
-        const idx=existing.indexOf(match);
-        const matchHasExit=!!(match.exitPrice||match.exitPrice===0);
-        const newHasExit=!!(nw.exitPrice||nw.exitPrice===0);
+    let existing = loadTrades().map(migrateTrade);
+    const clean=[], exitAdded=[], dupSkip=[], conflicts=[];
+    let memoUpdated=0;
 
-        // 진입가가 다르면 진짜 상반 (숫자 비교)
-        if(nw.entryPrice && !numEq(match.entryPrice, nw.entryPrice)){
-          conflicts.push({existing:match, incoming:nw});
-        // 둘 다 청산가 있는데 다르면 상반 (숫자 비교)
-        } else if(matchHasExit && newHasExit && !numEq(match.exitPrice, nw.exitPrice)){
-          conflicts.push({existing:match, incoming:nw});
-        // 기존에 청산 없고 새것에 청산 있으면 → 청산 업데이트 (핵심 수정)
-        } else if(!matchHasExit && newHasExit){
-          Object.assign(existing[idx], nw);
-          exitUpdated++;
-          duplicates.push(nw);
-        } else {
-          // 완전 중복 - memo만 병합
-          if(nw.memo){
+    newArr.forEach(nw=>{
+      const isExitRecord = !!(nw.exitQty || nw.exitPrice);
+
+      // ── 진입 기록 ──
+      if(!isExitRecord){
+        const match = existing.find(ex=>
+          ex.sym===nw.sym &&
+          (ex.entryDate??null)===(nw.entryDate??null) &&
+          numEq(ex.entryPrice, nw.entryPrice) &&
+          Number(ex.qty)===Number(nw.qty)
+        );
+        if(match){
+          if(nw.memo && nw.memo!==match.memo){
+            const idx=existing.indexOf(match);
             existing[idx].memo = match.memo ? match.memo+' / '+nw.memo : nw.memo;
             memoUpdated++;
           }
-          duplicates.push(nw);
+          dupSkip.push(nw);
+        } else {
+          clean.push(migrateTrade(nw));
         }
-      } else {
-        clean.push(nw);
+        return;
       }
+
+      // ── 청산 기록 ──
+      // 매칭: lotId > sym+entryDate+entryPrice > sym+entryDate 순
+      let target = null;
+      if(nw.lotId){
+        target = existing.find(ex=>ex.sym===nw.sym && String(ex.lotId)===String(nw.lotId) && ex.remainQty>0);
+      }
+      if(!target && nw.entryDate && nw.entryPrice){
+        target = existing.find(ex=>ex.sym===nw.sym && ex.entryDate===nw.entryDate && numEq(ex.entryPrice,nw.entryPrice) && ex.remainQty>0);
+      }
+      if(!target && nw.entryDate){
+        const cands = existing.filter(ex=>ex.sym===nw.sym && ex.entryDate===nw.entryDate && ex.remainQty>0);
+        if(cands.length===1) target=cands[0];
+      }
+      if(!target){
+        // 진입일 없으면 sym+진입가로 미청산 중 가장 먼저 진입한 것
+        const cands = existing.filter(ex=>ex.sym===nw.sym && ex.remainQty>0);
+        if(nw.entryPrice) target=cands.find(ex=>numEq(ex.entryPrice,nw.entryPrice));
+        if(!target && cands.length===1) target=cands[0];
+      }
+      if(!target){ conflicts.push({reason:'매칭 실패',nw}); return; }
+
+      const exitQty = Number(nw.exitQty||nw.qty||0);
+      const exitPrice = Number(nw.exitPrice);
+      const exitDate = nw.exitDate||null;
+      const type = nw.type||nw.exitType||null;
+      const entryPrice = Number(target.entryPrice);
+      const pnl = entryPrice ? parseFloat(((exitPrice-entryPrice)/entryPrice*100).toFixed(2)) : null;
+      const holdDays = calcTradingDays(target.entryDate, exitDate, target.market);
+      const stopDistNum = target.stopDist ? parseFloat(target.stopDist) : null;
+      const rVal = (stopDistNum&&pnl!=null) ? parseFloat((pnl/stopDistNum).toFixed(2)) : null;
+
+      if(exitQty > target.remainQty){ conflicts.push({reason:`청산수량(${exitQty}) > 잔여(${target.remainQty})`,nw}); return; }
+
+      const idx=existing.indexOf(target);
+      existing[idx].exits.push({ exitDate, exitQty, exitPrice, pnl, holdDays, rVal, type, memo:nw.memo||'' });
+      existing[idx].remainQty -= exitQty;
+      exitAdded.push(nw);
     });
-    
-    // 상반 있으면 중단 + 상세 표시
+
     if(conflicts.length){
-      let msg='⚠️ 상반되는 기록 '+conflicts.length+'건 발견. 추가 중단.\n\n';
-      conflicts.forEach(c=>{
-        msg+=c.existing.sym+' '+c.existing.entryDate+':\n';
-        msg+='  기존: 진입 '+c.existing.entryPrice;
-        if(c.existing.exitPrice) msg+=' / 청산 '+c.existing.exitPrice;
-        msg+='\n  새것: 진입 '+c.incoming.entryPrice;
-        if(c.incoming.exitPrice) msg+=' / 청산 '+c.incoming.exitPrice;
-        msg+='\n\n';
-      });
-      msg+='Claude에서 수정된 JSON을 받아 다시 시도하세요.';
-      alert(msg);
-      setStatus('pasteTradesStatus','❌ 상반 '+conflicts.length+'건 → 추가 중단','err');
-      return;
+      let msg='⚠️ 처리 불가 '+conflicts.length+'건:\n\n';
+      conflicts.forEach(c=>{ msg+=`${c.nw.sym||''}: ${c.reason}\n`; });
+      alert(msg); setStatus('pasteTradesStatus','❌ 처리 불가 '+conflicts.length+'건','err'); return;
     }
-    
-    // 중복 있으면 알림
-    if(duplicates.length){
-      if(!confirm('중복 '+duplicates.length+'건 발견 (건너뜁니다).\n새 기록 '+clean.length+'건만 추가합니다.\n계속할까요?')) return;
+
+    if(dupSkip.length && !clean.length && !exitAdded.length && !memoUpdated){
+      setStatus('pasteTradesStatus','ℹ️ 추가할 새 기록 없음 (전부 중복)','ok'); return;
     }
-    
-    if(!clean.length && !memoUpdated && !exitUpdated){
-      setStatus('pasteTradesStatus','ℹ️ 추가할 새 기록이 없습니다 (전부 중복)','ok');
-      return;
-    }
-    
-    trades=existing;
+
+    trades = existing;
     trades.push(...clean);
-    saveTrades();
-    renderTrades();
+    saveTrades(); renderTrades();
     document.getElementById('pasteTrades').value='';
-    let msg='✅ '+clean.length+'건 추가 완료 (총 '+trades.length+'건)';
-    if(duplicates.length) msg+=' / 중복 '+(duplicates.length-exitUpdated-memoUpdated)+'건 건너뜀';
-    if(exitUpdated) msg+=' / 청산 '+exitUpdated+'건 업데이트';
-    if(memoUpdated) msg+=' / 메모 '+memoUpdated+'건 업데이트';
+    let msg='✅ ';
+    if(clean.length) msg+=`진입 ${clean.length}건 추가`;
+    if(exitAdded.length) msg+=(clean.length?' / ':'')+`청산 ${exitAdded.length}건 반영`;
+    if(memoUpdated) msg+=` / 메모 ${memoUpdated}건`;
+    if(dupSkip.length) msg+=` / 중복 ${dupSkip.length}건 건너뜀`;
+    msg+=` (총 ${trades.length}건)`;
     setStatus('pasteTradesStatus',msg,'ok');
   }catch(e){
     setStatus('pasteTradesStatus','❌ JSON 파싱 오류: '+e.message,'err');
