@@ -1592,16 +1592,57 @@ function pasteAppendTrades(){
 
       // ── 진입 기록 ──
       if(!isExitRecord){
-        const match = existing.find(ex=>
+        // 1차: 완전 일치 (entryDate 포함)
+        let match = existing.find(ex=>
           ex.sym===nw.sym &&
           (ex.entryDate??null)===(nw.entryDate??null) &&
           numEq(ex.entryPrice, nw.entryPrice) &&
           Number(ex.qty)===Number(nw.qty)
         );
-        if(match){
-          if(nw.memo && nw.memo!==match.memo){
+        // 2차: 기존 entryDate가 null이고 나머지 동일 → 기존 기록 업데이트
+        if(!match && nw.entryDate){
+          match = existing.find(ex=>
+            ex.sym===nw.sym &&
+            !ex.entryDate &&
+            numEq(ex.entryPrice, nw.entryPrice) &&
+            Number(ex.qty)===Number(nw.qty)
+          );
+          if(match){
             const idx=existing.indexOf(match);
-            existing[idx].memo = match.memo ? match.memo+' / '+nw.memo : nw.memo;
+            // 빈 필드 업데이트
+            if(nw.entryDate) existing[idx].entryDate = nw.entryDate;
+            if(nw.entryGap && !existing[idx].entryGap) existing[idx].entryGap = nw.entryGap;
+            if(nw.stopDist && !existing[idx].stopDist) existing[idx].stopDist = nw.stopDist;
+            if(nw.weight && !existing[idx].weight) existing[idx].weight = nw.weight;
+            if(nw.tag && !existing[idx].tag) existing[idx].tag = nw.tag;
+            if(nw.lotId && !existing[idx].lotId) existing[idx].lotId = nw.lotId;
+            if(nw.market && !existing[idx].market) existing[idx].market = nw.market;
+            if(nw.memo && nw.memo!==existing[idx].memo){
+              existing[idx].memo = existing[idx].memo ? existing[idx].memo+' / '+nw.memo : nw.memo;
+            }
+            memoUpdated++;
+            dupSkip.push(nw);
+            return;
+          }
+        }
+        // 3차: lotId 기준 매칭 (sym+lotId+entryPrice 동일, entryDate 무관)
+        if(!match && nw.lotId){
+          match = existing.find(ex=>
+            ex.sym===nw.sym &&
+            String(ex.lotId)===String(nw.lotId) &&
+            numEq(ex.entryPrice, nw.entryPrice)
+          );
+        }
+        if(match){
+          const idx=existing.indexOf(match);
+          // 빈 필드 업데이트
+          if(nw.entryDate && !existing[idx].entryDate) existing[idx].entryDate = nw.entryDate;
+          if(nw.entryGap && !existing[idx].entryGap) existing[idx].entryGap = nw.entryGap;
+          if(nw.stopDist && !existing[idx].stopDist) existing[idx].stopDist = nw.stopDist;
+          if(nw.weight && !existing[idx].weight) existing[idx].weight = nw.weight;
+          if(nw.tag && !existing[idx].tag) existing[idx].tag = nw.tag;
+          if(nw.memo && nw.memo!==existing[idx].memo){
+            existing[idx].memo = existing[idx].memo ? existing[idx].memo+' / '+nw.memo : nw.memo;
             memoUpdated++;
           }
           dupSkip.push(nw);
