@@ -359,6 +359,11 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
     <button class="filter-btn" onclick="filterTrades('US',this)">US</button>
     <button class="filter-btn" onclick="filterTrades('KR',this)">KR</button>
   </div>
+  <div style="margin-bottom:10px;">
+    <select class="em-select" id="tradeYearFilter" style="width:auto;padding:5px 10px;font-size:11px;" onchange="tradeYear=this.value;renderTrades()">
+      <option value="전체">전체 연도</option>
+    </select>
+  </div>
   <div id="tradeList"></div>
 </div>
 
@@ -664,6 +669,7 @@ let trades    = loadTrades();
 let pendingImgs = JSON.parse(sessionStorage.getItem("pendingImgs") || "[]");
 let chatHistory = loadChatHistory();
 let tradeFilter = '전체';
+let tradeYear = '전체';
 
 function loadPortfolio() {
   try { const s=localStorage.getItem('v2_portfolio'); return s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_PORTFOLIO)); } catch(e){return JSON.parse(JSON.stringify(DEFAULT_PORTFOLIO));}
@@ -927,6 +933,18 @@ function filterTrades(f, btn) {
 function renderTrades() {
   const allMig = trades.map(migrateTrade);
 
+  // 연도 옵션 업데이트
+  const years=new Set();
+  allMig.forEach(t=>{
+    if(t.entryDate) years.add(t.entryDate.slice(0,4));
+    (t.exits||[]).forEach(e=>{ if(e.exitDate) years.add(e.exitDate.slice(0,4)); });
+  });
+  const yearSel=document.getElementById('tradeYearFilter');
+  if(yearSel){
+    const sorted=['전체',...[...years].sort().reverse()];
+    yearSel.innerHTML=sorted.map(y=>`<option value="${y}" ${y===tradeYear?'selected':''}>${y==='전체'?'전체 연도':y+'년'}</option>`).join('');
+  }
+
   let filtered = allMig;
   if(tradeFilter==='진행중') filtered=allMig.filter(t=>t.remainQty>0);
   else if(tradeFilter==='완료') filtered=allMig.filter(t=>t.remainQty<=0);
@@ -934,6 +952,14 @@ function renderTrades() {
   else if(tradeFilter==='판단청산') filtered=allMig.filter(t=>t.exits.some(e=>e.type==='판단청산'));
   else if(tradeFilter==='US') filtered=allMig.filter(t=>t.market==='US');
   else if(tradeFilter==='KR') filtered=allMig.filter(t=>t.market==='KR');
+
+  // 연도 필터: 진행중은 항상 표시, 완료는 exitDate 기준
+  if(tradeYear!=='전체'){
+    filtered=filtered.filter(t=>{
+      if(t.remainQty>0) return true;
+      return t.exits.some(e=>e.exitDate&&e.exitDate.startsWith(tradeYear));
+    });
+  }
 
   if(!filtered.length) {
     document.getElementById('tradeList').innerHTML=`<div class="msg system" style="margin-top:40px;display:block;text-align:center;">매매기록 없음</div>`;
@@ -1058,6 +1084,7 @@ function confirmExit() {
 let statsFilter='전체';
 let statsYear='전체';
 let statsMonth='전체';
+let statsMarket='전체';
 
 function renderStats() {
   const el=document.getElementById('statsContent');
@@ -1084,6 +1111,7 @@ function renderStats() {
   let filtered=allExits;
   if(statsYear!=='전체') filtered=filtered.filter(e=>e.exitDate&&e.exitDate.startsWith(statsYear));
   if(statsMonth!=='전체') filtered=filtered.filter(e=>e.exitDate&&e.exitDate.startsWith(statsMonth));
+  if(statsMarket!=='전체') filtered=filtered.filter(e=>e.market===statsMarket);
 
   // 필터 UI
   let filterHTML=`<div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
@@ -1092,6 +1120,11 @@ function renderStats() {
     </select>
     <select class="em-select" style="width:auto;padding:5px 10px;font-size:11px;" onchange="statsMonth=this.value;renderStats()">
       ${sortedMonths.map(m=>`<option value="${m}" ${m===statsMonth?'selected':''}>${m==='전체'?'전체 월':m}</option>`).join('')}
+    </select>
+    <select class="em-select" style="width:auto;padding:5px 10px;font-size:11px;" onchange="statsMarket=this.value;renderStats()">
+      <option value="전체" ${statsMarket==='전체'?'selected':''}>전체</option>
+      <option value="US" ${statsMarket==='US'?'selected':''}>US</option>
+      <option value="KR" ${statsMarket==='KR'?'selected':''}>KR</option>
     </select>
   </div>`;
 
