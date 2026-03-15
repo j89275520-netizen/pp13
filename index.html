@@ -183,6 +183,28 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 .remain-open { background:rgba(0,212,255,.1); color:var(--accent); border:1px solid var(--accent); }
 .remain-done { background:rgba(136,136,170,.1); color:var(--text2); border:1px solid var(--border); }
 .exit-add-btn { font-family:var(--sans); font-size:11px; background:var(--accent2); color:white; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; }
+.trade-action-btns { display:flex; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.trade-act-btn {
+  flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;
+  font-family:var(--sans); font-size:11px; font-weight:700; cursor:pointer;
+  background:var(--bg3); color:var(--text2); transition:all .2s;
+}
+.trade-act-btn:active { opacity:.7; }
+.trade-act-btn.edit { color:var(--accent); border-color:var(--accent); }
+.trade-act-btn.del { color:var(--red); border-color:var(--red); }
+.edit-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:500; display:flex; align-items:flex-end; }
+.edit-modal {
+  background:var(--bg2); border:1px solid var(--border); border-radius:20px 20px 0 0;
+  padding:20px 16px; width:100%; max-height:80vh; overflow-y:auto;
+}
+.edit-modal-title { font-family:var(--mono); font-size:13px; color:var(--accent); margin-bottom:14px; }
+.edit-field-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.edit-field-label { font-size:10px; color:var(--text2); width:70px; flex-shrink:0; text-transform:uppercase; letter-spacing:.05em; }
+.edit-field-input {
+  flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  font-family:var(--mono); font-size:13px; padding:9px 11px; border-radius:8px; outline:none;
+}
+.edit-field-input:focus { border-color:var(--accent); }
 .exit-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:500; display:flex; align-items:flex-end; }
 .exit-modal { background:var(--bg2); border:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px 16px; width:100%; }
 .exit-modal-title { font-family:var(--mono); font-size:13px; color:var(--accent); margin-bottom:14px; }
@@ -1150,6 +1172,10 @@ function renderTrades() {
           <span class="remain-badge ${isOpen?'remain-open':'remain-done'}">${isOpen?`잔여 ${t.remainQty}주`:'전량 청산'}</span>
           ${isOpen?`<button class="exit-add-btn" onclick="openExitModal(${allMig.indexOf(t)})">+ 청산 추가</button>`:''}
         </div>
+        <div class="trade-action-btns">
+          <button class="trade-act-btn edit" onclick="openEditModal(${allMig.indexOf(t)})">✏️ 편집</button>
+          <button class="trade-act-btn del" onclick="deleteTrade(${allMig.indexOf(t)})">🗑️ 삭제</button>
+        </div>
       </div>
     </div>`;
   });
@@ -1196,6 +1222,140 @@ function confirmExit() {
   saveTrades();
   renderTrades();
   closeExitModal();
+}
+
+// ═══════════════════════════════════════════════
+// TRADE EDIT / DELETE
+// ═══════════════════════════════════════════════
+let _editTargetIdx = null;
+const editFields = [
+  {key:'sym',label:'종목',type:'text'},
+  {key:'market',label:'마켓',type:'select',opts:['US','KR']},
+  {key:'lotId',label:'LotId',type:'text'},
+  {key:'entryDate',label:'진입일',type:'date'},
+  {key:'entryPrice',label:'평단',type:'number'},
+  {key:'qty',label:'수량',type:'number'},
+  {key:'stopDist',label:'손절거리',type:'text'},
+  {key:'entryGap',label:'진입괴리율',type:'text'},
+  {key:'weight',label:'비중',type:'text'},
+  {key:'memo',label:'메모',type:'text'},
+];
+
+function openEditModal(migIdx){
+  _editTargetIdx = migIdx;
+  const t = migrateTrade(trades[migIdx]);
+  let h = `<div class="edit-modal-overlay" id="editModal" onclick="if(event.target===this)closeEditModal()">
+    <div class="edit-modal">
+      <div class="edit-modal-title">📝 #${migIdx+1} ${t.sym} ${t.lotId||''} 편집</div>`;
+  editFields.forEach(f=>{
+    const val = t[f.key]!=null ? t[f.key] : '';
+    if(f.type==='select'){
+      h+=`<div class="edit-field-row"><span class="edit-field-label">${f.label}</span>
+        <select class="edit-field-input" id="ef_${f.key}">${f.opts.map(o=>`<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}</select></div>`;
+    } else {
+      h+=`<div class="edit-field-row"><span class="edit-field-label">${f.label}</span>
+        <input class="edit-field-input" id="ef_${f.key}" type="${f.type==='date'?'date':'text'}" value="${val}"></div>`;
+    }
+  });
+  // exits 편집 (간략: 각 exit의 주요 필드)
+  if(t.exits.length){
+    h+=`<div style="font-size:11px;color:var(--accent);margin:12px 0 8px;font-family:var(--mono);">청산 기록</div>`;
+    t.exits.forEach((e,ei)=>{
+      h+=`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:10px;color:var(--text2);font-family:var(--mono);">${ei+1}차 청산</span>
+          <button class="trade-act-btn del" style="flex:0;padding:4px 10px;font-size:10px;" onclick="deleteExit(${migIdx},${ei})">삭제</button>
+        </div>
+        <div class="edit-field-row"><span class="edit-field-label">청산일</span><input class="edit-field-input" id="ef_exit${ei}_date" type="date" value="${e.exitDate||''}"></div>
+        <div class="edit-field-row"><span class="edit-field-label">청산가</span><input class="edit-field-input" id="ef_exit${ei}_price" type="text" value="${e.exitPrice||''}"></div>
+        <div class="edit-field-row"><span class="edit-field-label">청산수량</span><input class="edit-field-input" id="ef_exit${ei}_qty" type="text" value="${e.exitQty||''}"></div>
+        <div class="edit-field-row"><span class="edit-field-label">유형</span>
+          <select class="edit-field-input" id="ef_exit${ei}_type">
+            <option value="손절" ${e.type==='손절'?'selected':''}>손절</option>
+            <option value="판단청산" ${e.type==='판단청산'?'selected':''}>판단청산</option>
+            <option value="익절" ${e.type==='익절'?'selected':''}>익절</option>
+          </select></div>
+        <div class="edit-field-row"><span class="edit-field-label">메모</span><input class="edit-field-input" id="ef_exit${ei}_memo" type="text" value="${e.memo||''}"></div>
+      </div>`;
+    });
+  }
+  h+=`<div style="display:flex;gap:8px;margin-top:14px;">
+    <button class="em-btn cancel" onclick="closeEditModal()">취소</button>
+    <button class="em-btn confirm" onclick="confirmEdit()">저장</button>
+  </div></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+
+function closeEditModal(){
+  const el=document.getElementById('editModal');
+  if(el) el.remove();
+  _editTargetIdx=null;
+}
+
+function confirmEdit(){
+  if(_editTargetIdx===null) return;
+  const t = migrateTrade(trades[_editTargetIdx]);
+  editFields.forEach(f=>{
+    const el=document.getElementById('ef_'+f.key);
+    if(!el) return;
+    let v = el.value;
+    if(f.key==='qty'||f.key==='entryPrice'){
+      v = f.key==='qty'?parseInt(v):parseFloat(v);
+      if(isNaN(v)) return;
+    }
+    t[f.key]=v;
+  });
+  // exits 업데이트
+  t.exits.forEach((e,ei)=>{
+    const dEl=document.getElementById('ef_exit'+ei+'_date');
+    const pEl=document.getElementById('ef_exit'+ei+'_price');
+    const qEl=document.getElementById('ef_exit'+ei+'_qty');
+    const tEl=document.getElementById('ef_exit'+ei+'_type');
+    const mEl=document.getElementById('ef_exit'+ei+'_memo');
+    if(dEl) e.exitDate=dEl.value;
+    if(pEl) e.exitPrice=parseFloat(pEl.value)||e.exitPrice;
+    if(qEl) e.exitQty=parseInt(qEl.value)||e.exitQty;
+    if(tEl) e.type=tEl.value;
+    if(mEl) e.memo=mEl.value;
+    // pnl, rVal 재계산
+    if(t.entryPrice && e.exitPrice){
+      e.pnl=parseFloat(((e.exitPrice-Number(t.entryPrice))/Number(t.entryPrice)*100).toFixed(2));
+    }
+    if(e.exitDate && t.entryDate){
+      e.holdDays=calcTradingDays(t.entryDate,e.exitDate,t.market);
+    }
+    if(t.stopDist && e.pnl!=null){
+      const sd=parseFloat(t.stopDist);
+      e.rVal=sd?parseFloat((e.pnl/sd).toFixed(2)):null;
+    }
+  });
+  // remainQty 재계산
+  const exitedQty = t.exits.reduce((a,e)=>a+Number(e.exitQty||0),0);
+  t.remainQty = Number(t.qty) - exitedQty;
+  trades[_editTargetIdx]=t;
+  saveTrades();
+  renderTrades();
+  closeEditModal();
+}
+
+function deleteTrade(migIdx){
+  const t = migrateTrade(trades[migIdx]);
+  if(!confirm(`#${migIdx+1} ${t.sym} ${t.lotId||''} 을(를) 삭제할까요?`)) return;
+  trades.splice(migIdx,1);
+  saveTrades();
+  renderTrades();
+}
+
+function deleteExit(migIdx,exitIdx){
+  const t = migrateTrade(trades[migIdx]);
+  if(!confirm(`${t.sym} ${exitIdx+1}차 청산을 삭제할까요?`)) return;
+  const removedQty = Number(t.exits[exitIdx].exitQty||0);
+  t.exits.splice(exitIdx,1);
+  t.remainQty = Number(t.qty) - t.exits.reduce((a,e)=>a+Number(e.exitQty||0),0);
+  trades[migIdx]=t;
+  saveTrades();
+  renderTrades();
+  closeEditModal();
 }
 
 // ═══════════════════════════════════════════════
