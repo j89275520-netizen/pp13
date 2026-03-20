@@ -404,7 +404,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
     <button class="filter-btn" data-filter="KR" onclick="toggleFilter(this)">KR</button>
   </div>
   <div class="sym-search-wrap">
-    <input type="text" class="sym-search-input" id="symSearchInput" placeholder="종목명 검색..." oninput="onSymSearch(this.value)" onfocus="onSymSearch(this.value)">
+    <input type="text" class="sym-search-input" id="symSearchInput" placeholder="종목명 검색..." oninput="onSymSearch(this.value)" onfocus="onSymSearch(this.value)" autocomplete="off" data-lpignore="true" data-form-type="other">
     <div class="sym-ac-list" id="symAcList"></div>
   </div>
   <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">
@@ -439,7 +439,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
         <button class="icon-btn" onclick="document.getElementById('fileInput').click()">📎</button>
         <input type="file" id="fileInput" accept="image/*" multiple onchange="handleFiles(event)" style="display:none">
         <textarea class="text-input" id="textInput" placeholder="지시사항 입력..." rows="1"
-          oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+          oninput="autoResize(this)" onkeydown="handleKey(event)" autocomplete="off" data-lpignore="true" data-form-type="other"></textarea>
         <button class="icon-btn send" id="sendBtn" onclick="sendMsg()">↑</button>
       </div>
     </div>
@@ -454,7 +454,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <div class="s-title">API 설정</div>
       <div class="s-desc">Claude API 키 입력 (console.anthropic.com에서 발급)<br>키는 기기 내 로컬에만 저장됩니다.</div>
       <div class="s-label">Anthropic API Key</div>
-      <input type="password" class="s-input" id="apiKeyInput" placeholder="sk-ant-...">
+      <input type="password" class="s-input" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" data-lpignore="true" data-form-type="other">
       <button class="s-btn" onclick="saveApiKey()">저장</button>
       <div class="s-status" id="apiStatus"></div>
     </div>
@@ -469,7 +469,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
         <button class="s-tool-btn" onclick="showRulesHistory()">📋 이력</button>
         <span class="s-badge" id="rulesBadge" style="display:none"></span>
       </div>
-      <textarea class="s-textarea" id="rulesEditor"></textarea>
+      <textarea class="s-textarea" id="rulesEditor" autocomplete="off" data-form-type="other"></textarea>
       <button class="s-btn" style="margin-top:8px;" onclick="saveRules()">규칙 저장</button>
     </div>
 
@@ -480,7 +480,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <div class="s-desc">Claude에서 출력한 JSON을 붙여넣거나, .json 파일을 첨부하세요.<br>다른 데이터는 건드리지 않습니다.</div>
       
       <div class="s-label">포트폴리오 JSON</div>
-      <textarea class="s-textarea" id="pastePortfolio" style="min-height:100px;" placeholder='{"us":[...],"kr":[...]} 형식의 JSON 붙여넣기'></textarea>
+      <textarea class="s-textarea" id="pastePortfolio" autocomplete="off" data-form-type="other" style="min-height:100px;" placeholder='{"us":[...],"kr":[...]} 형식의 JSON 붙여넣기'></textarea>
       <div style="display:flex;gap:8px;margin-top:6px;">
         <button class="s-btn" style="flex:1;margin:0;" onclick="pasteApplyPortfolio()">적용</button>
         <button class="s-btn dim" style="flex:1;margin:0;" onclick="document.getElementById('filePortfolio').click()">📎 파일</button>
@@ -490,7 +490,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <div class="s-status" id="pastePortfolioStatus"></div>
 
       <div class="s-label" style="margin-top:14px;">매매기록 JSON</div>
-      <textarea class="s-textarea" id="pasteTrades" style="min-height:100px;" placeholder='[{"sym":"DFEN",...},...] 형식의 JSON 붙여넣기'></textarea>
+      <textarea class="s-textarea" id="pasteTrades" autocomplete="off" data-form-type="other" style="min-height:100px;" placeholder='[{"sym":"DFEN",...},...] 형식의 JSON 붙여넣기'></textarea>
       <div style="display:flex;gap:8px;margin-top:6px;">
         <button class="s-btn" style="flex:1;margin:0;" onclick="pasteApplyTrades()">전체교체</button>
         <button class="s-btn dim" style="flex:1;margin:0;" onclick="pasteAppendTrades()">추가</button>
@@ -501,7 +501,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <div class="s-status" id="pasteTradesStatus"></div>
 
       <div class="s-label" style="margin-top:14px;">운영규칙 텍스트</div>
-      <textarea class="s-textarea" id="pasteRules" style="min-height:100px;" placeholder="운영규칙 텍스트 붙여넣기"></textarea>
+      <textarea class="s-textarea" id="pasteRules" autocomplete="off" data-form-type="other" style="min-height:100px;" placeholder="운영규칙 텍스트 붙여넣기"></textarea>
       <button class="s-btn" style="margin-top:6px;" onclick="pasteApplyRules()">운영규칙 적용</button>
       <div class="s-status" id="pasteRulesStatus"></div>
     </div>
@@ -983,20 +983,15 @@ function applyTradeFilters(allMig){
   let filtered = allMig;
   if(!tradeFilter.has('전체')){
     filtered = allMig.filter(t=>{
-      let pass = true;
-      if(tradeFilter.has('진행중') || tradeFilter.has('완료')){
-        const statusPass = (tradeFilter.has('진행중') && t.remainQty>0) || (tradeFilter.has('완료') && t.remainQty<=0);
-        if(!statusPass) pass=false;
+      for(const f of tradeFilter){
+        if(f==='진행중' && !(t.remainQty>0)) return false;
+        if(f==='완료' && !(t.remainQty<=0)) return false;
+        if(f==='손절' && !t.exits.some(e=>e.type==='손절')) return false;
+        if(f==='판단청산' && !t.exits.some(e=>e.type==='판단청산')) return false;
+        if(f==='US' && t.market!=='US') return false;
+        if(f==='KR' && t.market!=='KR') return false;
       }
-      if(tradeFilter.has('손절') || tradeFilter.has('판단청산')){
-        const typePass = (tradeFilter.has('손절') && t.exits.some(e=>e.type==='손절')) || (tradeFilter.has('판단청산') && t.exits.some(e=>e.type==='판단청산'));
-        if(!typePass) pass=false;
-      }
-      if(tradeFilter.has('US') || tradeFilter.has('KR')){
-        const mktPass = (tradeFilter.has('US') && t.market==='US') || (tradeFilter.has('KR') && t.market==='KR');
-        if(!mktPass) pass=false;
-      }
-      return pass;
+      return true;
     });
   }
   if(tradeSymSearch){
