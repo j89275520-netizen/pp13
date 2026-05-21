@@ -1019,6 +1019,7 @@ function renderTrades() {
           <div class="lot-item"><span class="li-label">진입가</span><span class="li-val">${fmtV(t.entryPrice,isKr)}</span></div>
           <div class="lot-item"><span class="li-label">수량</span><span class="li-val">${t.qty}</span></div>
           <div class="lot-item"><span class="li-label">잔여</span><span class="li-val ${isOpen?'pos':'neu'}">${t.remainQty}주</span></div>
+          ${(t.entryPrice&&t.qty)?`<div class="lot-item" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:6px;margin-top:2px;"><span class="li-label">총금액 (평단×수량)</span><span class="li-val" style="color:var(--yellow);font-size:13px;">${fmtV(Math.round(Number(t.entryPrice)*Number(t.qty)),isKr)}</span></div>`:''}
           ${t.entryGap?`<div class="lot-item"><span class="li-label">진입괴리율</span><span class="li-val">${t.entryGap}</span></div>`:''}
           ${t.stopDist?`<div class="lot-item"><span class="li-label">손절거리</span><span class="li-val">${t.stopDist}</span></div>`:''}
           ${t.weight?`<div class="lot-item"><span class="li-label">진입비중</span><span class="li-val">${t.weight}</span></div>`:''}
@@ -1382,8 +1383,8 @@ function renderStats() {
   const maxRBucket=Math.max(...Object.values(rBuckets),1);
 
   // 산점도 데이터: 괴리율 vs 수익률
-  const scatterGap=filtered.filter(e=>e.entryGap&&e.pnl!=null).map(e=>({
-    x:parseFloat(String(e.entryGap).replace('%','')),
+  const scatterGap=filtered.filter(e=>e.pnl!=null).map(e=>({
+    x:e.entryGap?parseFloat(String(e.entryGap).replace('%','')):0,
     y:parseFloat(e.pnl)
   }));
 
@@ -1391,6 +1392,30 @@ function renderStats() {
   const scatterHold=filtered.filter(e=>e.holdDays&&e.pnl!=null).map(e=>({
     x:Number(e.holdDays), y:parseFloat(e.pnl)
   }));
+
+  // 총금액 기준 통계
+  function calcWeighted(exits){
+    let inv=0,profit=0;
+    exits.forEach(e=>{
+      const qty=Number(e.exitQty||0),ep=Number(e.entryPrice||0),xp=Number(e.exitPrice||0);
+      if(ep&&qty){inv+=ep*qty;profit+=(xp-ep)*qty;}
+    });
+    return{inv,profit,rate:inv?(profit/inv*100):null};
+  }
+  const wAll=calcWeighted(filtered);
+  const wUS=calcWeighted(filtered.filter(e=>e.market==='US'));
+  const wKR=calcWeighted(filtered.filter(e=>e.market==='KR'));
+  const fmtAmt=(v,kr)=>v==null?'N/A':(kr?Math.round(v).toLocaleString('ko-KR')+'원':v>=1000000?'$'+(v/1000000).toFixed(2)+'M':'$'+v.toFixed(0));
+  const symAmtMap={};
+  filtered.forEach(e=>{
+    if(!symAmtMap[e.sym])symAmtMap[e.sym]={inv:0,profit:0,cnt:0,market:e.market};
+    const qty=Number(e.exitQty||0),ep=Number(e.entryPrice||0),xp=Number(e.exitPrice||0);
+    if(ep&&qty){symAmtMap[e.sym].inv+=ep*qty;symAmtMap[e.sym].profit+=(xp-ep)*qty;symAmtMap[e.sym].cnt++;}
+  });
+  const symAmtRank=Object.entries(symAmtMap).map(([s,d])=>({
+    sym:s,inv:d.inv,profit:d.profit,rate:d.inv?(d.profit/d.inv*100):0,cnt:d.cnt,market:d.market
+  })).sort((a,b)=>b.inv-a.inv);
+  const maxInv=symAmtRank.length?symAmtRank[0].inv:1;
 
   el.innerHTML=filterHTML+`
     <div class="section-label">수익성</div>
@@ -1460,10 +1485,6 @@ function renderStats() {
       <div class="stats-card">
         <div class="sc-title">청산유형</div>
         <div class="sc-sub" style="font-size:12px;">손절 ${손절cnt} / 판단 ${판단cnt} / 익절 ${익절cnt}</div>
-      </div>
-      <div class="stats-card">
-        <div class="sc-title">연속 기록</div>
-        <div class="sc-sub" style="font-size:12px;"><span class="pos">최대연승 ${maxConsecWin}</span> / <span class="neg">최대연패 ${maxConsecLoss}</span></div>
       </div>
       <div class="stats-card full">
         <div class="sc-title">R값 분포</div>
@@ -1540,6 +1561,50 @@ function renderStats() {
           1~5일: ${avgPnlShort}% (${shortTerm.length}건)<br>
           6~20일: ${avgPnlMid}% (${midTerm.length}건)<br>
           20일+: ${avgPnlLong}% (${longTerm.length}건)
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">총금액 기준</div>
+    <div class="stats-grid">
+      <div class="stats-card">
+        <div class="sc-title">가중 평균 수익률</div>
+        <div class="sc-val ${wAll.rate!=null&&wAll.rate>=0?'pos':'neg'}">${wAll.rate!=null?wAll.rate.toFixed(2)+'%':'N/A'}</div>
+        <div class="sc-sub">투자금액 가중 (단순평균 ${avgPnl}%)</div>
+      </div>
+      <div class="stats-card">
+        <div class="sc-title">실현 손익합</div>
+        <div class="sc-val ${wAll.profit>=0?'pos':'neg'}">${wAll.profit>=0?'+':''}${wAll.profit.toFixed(0)}</div>
+        <div class="sc-sub" style="font-size:9px;">US $${wUS.profit.toFixed(0)} / KR ${Math.round(wKR.profit).toLocaleString('ko-KR')}원</div>
+      </div>
+      <div class="stats-card">
+        <div class="sc-title">US 가중 수익률</div>
+        <div class="sc-val ${wUS.rate!=null&&wUS.rate>=0?'pos':'neg'}">${wUS.rate!=null?wUS.rate.toFixed(2)+'%':'N/A'}</div>
+        <div class="sc-sub">투입 $${wUS.inv.toFixed(0)} / 손익 $${wUS.profit.toFixed(0)}</div>
+      </div>
+      <div class="stats-card">
+        <div class="sc-title">KR 가중 수익률</div>
+        <div class="sc-val ${wKR.rate!=null&&wKR.rate>=0?'pos':'neg'}">${wKR.rate!=null?wKR.rate.toFixed(2)+'%':'N/A'}</div>
+        <div class="sc-sub">투입 ${Math.round(wKR.inv).toLocaleString('ko-KR')}원 / 손익 ${Math.round(wKR.profit).toLocaleString('ko-KR')}원</div>
+      </div>
+      <div class="stats-card full">
+        <div class="sc-title">종목별 투자금액 순위</div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px;">
+          ${symAmtRank.slice(0,10).map(s=>{
+            const barW=(s.inv/maxInv*100).toFixed(1);
+            const rc=s.rate>=0?'pos':'neg';
+            const isKrSym=s.market==='KR';
+            const invDisp=isKrSym?Math.round(s.inv).toLocaleString('ko-KR')+'원':'$'+s.inv.toFixed(0);
+            return `<div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                <span style="font-family:var(--mono);font-size:11px;">${s.sym}</span>
+                <span class="${rc}" style="font-family:var(--mono);font-size:11px;">${s.rate>=0?'+':''}${s.rate.toFixed(2)}% · ${invDisp} (${s.cnt}건)</span>
+              </div>
+              <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;">
+                <div style="width:${barW}%;height:100%;background:${s.rate>=0?'var(--green)':'var(--red)'};opacity:.7;border-radius:2px;"></div>
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>
     </div>
