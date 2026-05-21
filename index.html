@@ -1382,9 +1382,9 @@ function renderStats() {
   });
   const maxRBucket=Math.max(...Object.values(rBuckets),1);
 
-  // 산점도 데이터: 괴리율 vs 수익률
-  const scatterGap=filtered.filter(e=>e.pnl!=null).map(e=>({
-    x:e.entryGap?parseFloat(String(e.entryGap).replace('%','')):0,
+  // 산점도 데이터: 손절거리 vs 수익률
+  const scatterGap=filtered.filter(e=>e.stopDist&&e.pnl!=null).map(e=>({
+    x:parseFloat(String(e.stopDist).replace('%','')),
     y:parseFloat(e.pnl)
   }));
 
@@ -1504,7 +1504,7 @@ function renderStats() {
     <div class="section-label">진입품질</div>
     <div class="stats-grid">
       <div class="stats-card full">
-        <div class="sc-title">괴리율 vs 수익률</div>
+        <div class="sc-title">손절거리 vs 수익률</div>
         <canvas id="scatterGap" width="300" height="180" style="width:100%;height:180px;"></canvas>
       </div>
       <div class="stats-card full">
@@ -1612,7 +1612,7 @@ function renderStats() {
 
   // 산점도 그리기
   setTimeout(()=>{
-    drawScatter('scatterGap', scatterGap, '괴리율%', '수익률%');
+    drawScatter('scatterGap', scatterGap, '손절거리%', '수익률%');
     drawScatter('scatterHold', scatterHold, '보유일', '수익률%');
   },50);
 }
