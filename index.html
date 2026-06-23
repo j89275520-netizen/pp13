@@ -116,6 +116,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 .li-label { font-size:9px; color:var(--text2); text-transform:uppercase; letter-spacing:.05em; }
 .li-val { font-family:var(--mono); font-size:12px; }
 .stop-line { font-size:10px; color:var(--red); font-family:var(--mono); margin-top:4px; line-height:1.4; }
+.stop-meta { font-size:10px; color:var(--text2); font-family:var(--mono); margin-top:2px; line-height:1.4; }
 
 .pos { color:var(--green); }
 .neg { color:var(--red); }
@@ -604,13 +605,132 @@ const DEFAULT_PORTFOLIO = {
 
 const DEFAULT_TRADES = []; // 매매기록 초기값 비어있음
 
+// v2.6.1 FINAL 출력/운영 정책: ChatGPT 지침 화면 축약 기본 지침 + 풀버전 소스파일 + 채팅방 요구사항 통합
+const SOURCE_POLICY_V26_FINAL = {
+  chatgptInstructionScreen: [
+    '기존 DB 전체 유지',
+    '파킹용 자산 제외',
+    'NaN·수량 불일치·lotId 충돌·JSON 복구는 데이터 무결성 우선',
+    '신규 체결은 새 Lot, 로트 합산 금지',
+    '청산은 기존 Lot exits 배열에만 추가',
+    '가짜 진입정보와 가짜 lotId 생성 금지',
+    '수량 일치 최우선',
+    '일반 포폴 코드블럭 금지',
+    '모바일 줄바꿈: 평단|수익률 / 비중|노출도',
+    '무결성 체크는 이상 있을 때만 출력',
+    '상세 계산 과정은 조건부 출력',
+    '손절유형과 래칫 여부 필수 표시'
+  ],
+  fullSourceFiles: [
+    '포트폴리오_운영지침_v2.4_풀버전.txt',
+    '포폴_이어받기_템플릿_v2.4.txt',
+    '매매일지_샘플_JSON_v2.4.json',
+    'index.html',
+    'sw.js'
+  ],
+  briefOperatingGuide: [
+    '기존 DB 전체 유지',
+    'Lot 합산 금지',
+    '신규 체결은 항상 새 Lot 생성',
+    '청산은 기존 Lot의 exits 배열에만 추가',
+    '가짜 진입정보와 가짜 lotId 생성 금지',
+    '미체결 주문은 매매기록 제외',
+    '수량 일치 최우선',
+    'JSON 루트 형식 구분',
+    '파킹용 자산은 노출도와 매매기록에서 제외'
+  ],
+  memoryAndChatRequirements: [
+    '일반 포폴 출력은 코드블럭 금지',
+    '모바일 줄바꿈: 평단|수익률 / 비중|노출도',
+    '무결성 체크는 이상 있을 때만 출력',
+    '상세 계산 과정은 조건부 출력',
+    '손절가에 손절유형과 래칫 여부 표시',
+    '전체평단은 증권사 기준, Lot 평단은 체결가 기준',
+    '백업 역산 보정 평단은 화면 표시 금지',
+    '차트 스샷 상단 이평은 SMA, 하단 이평은 EMA'
+  ],
+  priority: [
+    '현재 명시 지시',
+    'ChatGPT 지침 화면 축약 기본 지침',
+    '현재/이전 채팅방 요구사항',
+    '포폴 이어받기 텍스트·기존 JSON·실제 잔고',
+    '풀버전 운영지침 파일',
+    '앱 소스 기본값'
+  ]
+};
+
+const OUTPUT_POLICY_V26_FINAL = {
+  normalPortfolioUsesCodeBlock: false,
+  mobileLotLineBreak: true,
+  lotLine1: '평단 | 수익률',
+  lotLine2: '비중 | 노출도',
+  forbidOneLineLotMetrics: true,
+  stopMustShowType: true,
+  stopMustShowRatchet: true,
+  detailCalcDefault: '생략',
+  detailCalcWhen: ['새 차트 데이터', '손절 재계산', '신규 체결', '청산', '오류 검증'],
+  integrityCheckOutput: '이상 있을 때만 출력',
+  reportMustSeparateSources: true
+};
+const OUTPUT_POLICY_V25 = OUTPUT_POLICY_V26_FINAL;
+const OUTPUT_POLICY_FINAL = OUTPUT_POLICY_V26_FINAL;
+
 const DEFAULT_RULES = `════════════════════════
-■ 기본 원칙
+■ 기본 원칙 v2.6 FINAL
 ════════════════════════
-• 로트 합산 금지 (명시 지시 시만 예외)
+• 본 앱/포폴 작업 기준은 세 출처를 분리해 적용한다.
+  1) ChatGPT 지침 화면 축약 기본 지침
+  2) 소스파일 풀버전
+  3) 현재·이전 채팅방 요구사항
+  4) 포폴 이어받기 텍스트/기존 JSON/실제 잔고
+• 충돌 시 우선순위:
+  현재 명시 지시 > ChatGPT 지침 화면 축약 기본 지침 > 현재/이전 채팅방 요구사항 > 포폴 이어받기 텍스트·기존 JSON·실제 잔고 > 풀버전 운영지침 파일 > 앱 기본값
+
+════════════════════════
+■ 축약 운영지침
+════════════════════════
+• 기존 DB 전체 유지
+• 사용자가 명시적으로 전체교체/복구를 지시하지 않으면 기존 항목 임의 삭제·축약 금지
+• 로트 합산 금지
 • 신규 체결 = 새 Lot 생성
-• 손절·수익률 → 로트별 개별 계산
-• 기존 DB 전체 유지 (삭제·축약 절대 금지)
+• 1 Lot = 1 진입기록
+• 1 진입 = n 청산 가능
+• 청산은 기존 Lot의 exits 배열에만 추가
+• 진입정보 임의 생성 금지
+• entryPrice:0, entryDate:null, qty:0 같은 가짜 진입기록 금지
+• old_lot1 같은 가짜 lotId 금지
+• 미체결 주문은 매매기록 제외
+• 수량 일치 최우선
+• 파킹용 자산은 노출도와 매매기록에서 제외
+
+════════════════════════
+■ 모바일 출력 포맷
+════════════════════════
+• 포폴 일반 출력은 코드블럭 금지
+• 한 줄 과밀 출력 금지
+• Lot 수치 줄바꿈 고정:
+  평단 | 수익률
+  비중 | 노출도
+• 손절가에는 손절유형과 래칫 여부를 함께 표시
+• 무결성 체크는 이상 있을 때만 출력
+
+════════════════════════
+■ 상세 계산 과정 출력 조건
+════════════════════════
+평소에는 생략.
+단, 아래 경우에는 출력:
+• 새 차트 데이터/새 현재가/새 이평선 반영
+• 손절 재계산
+• 신규 체결
+• 청산
+• 오류 검증, NaN, 수량 불일치, lotId 충돌, JSON 복구
+
+════════════════════════
+■ 평단 표시
+════════════════════════
+• 전체평단은 증권사 계좌 기준 유지
+• Lot 평단은 체결가 기준 표시
+• 백업 역산 보정 평단은 포폴 화면에 표시하지 않음
 
 ════════════════════════
 ■ 계산 로직
@@ -619,33 +739,30 @@ const DEFAULT_RULES = `═══════════════════
 • 기계적손절가:
   비레버 → 평단*0.9
   2배레버 → 평단*0.8
+  3배레버 → 평단*0.7
 • 20일선손절가:
-  비레버 → 20일선*0.99
-  레버 → 환산 공식
+  비레버 → 20일선*0.98
+  레버 → 본주 기준 환산 공식
 
 ════════════════════════
 ■ 레버 이동평균선 환산
 ════════════════════════
-1) 본주이평선*0.99 = 기준가
+1) 본주이평선*0.98 = 기준가
 2) 기준가/본주현재가-1 = 괴리율
-3) 레버손절가 = 레버현재가*(1+(괴리율*2))
+3) 레버손절가 = 레버현재가*(1+(괴리율*레버배수))
 
 ════════════════════════
 ■ 실사용손절가 계산
 ════════════════════════
-MIN(20일선손절가, 기계적손절가) → 둘 중 낮은 가격 사용
-
-[수익률 20% 초과 시]
-손절선을 평단으로 상향
-→ 이후 손절선이 평단 아래로 내려가지 않음
-→ 단, 20일선이 평단을 상회하면 20일선 손절로 복귀
+MIN(20일선환산손절가, 기계적손절가) → 둘 중 낮은 가격 사용
+단, 한 번 올라간 손절선은 절대 내리지 않음
+기존 래칫선이 있으면 신규 계산값이 낮아도 기존선 유지
 
 ════════════════════════
-■ 포지션 사이징
+■ 차트 스샷 기준
 ════════════════════════
-• 진입당 최대손실: 전체계좌의 2%
-• 손절거리% = (현재가-실사용손절가)/현재가*100
-• 진입비중% = 2% / 손절거리% (상한선)
+• 팝업 상단 이평 5/10/20 = SMA
+• 팝업 하단 이평 5/10/20 = EMA
 
 ════════════════════════
 ■ 익절 규칙
@@ -775,6 +892,7 @@ function renderMarket(label, tickers, kr) {
           ${lot.tp?`<div class="lot-item"><span class="li-label">익절가</span><span class="li-val pos">${fmtP(lot.tp,kr)}</span></div>`:''}
         </div>
         <div class="stop-line">실사용손절 ${lot.stopLabel}</div>
+        ${(lot.stopType||lot.ratchet)?`<div class="stop-meta">${lot.stopType?`유형 ${lot.stopType}`:''}${lot.stopType&&lot.ratchet?' · ':''}${lot.ratchet?`래칫 ${lot.ratchet}`:''}</div>`:''}
       </div>`;
     });
     h+=`</div></div>`;
@@ -1812,7 +1930,16 @@ function pasteAppendTrades(){
 
     let existing = loadTrades().map(migrateTrade);
     const clean=[], exitAdded=[], dupSkip=[], conflicts=[];
-    let memoUpdated=0;
+    let memoUpdated=0, metadataUpdated=0, metadataFieldUpdated=0;
+    const isBlank=v=>v===undefined||v===null||v==='';
+    const fillEmpty=(target, source, key)=>{
+      if(!isBlank(source[key]) && isBlank(target[key])){
+        target[key]=source[key];
+        metadataFieldUpdated++;
+        return true;
+      }
+      return false;
+    };
 
     newArr.forEach(nw=>{
       // 완성된 flat 기록(진입+청산 세트) vs 순수 청산 추가 구분
@@ -1841,17 +1968,15 @@ function pasteAppendTrades(){
           );
           if(match){
             const idx=existing.indexOf(match);
-            // 빈 필드 업데이트
-            if(nw.entryDate) existing[idx].entryDate = nw.entryDate;
-            if(nw.entryGap && !existing[idx].entryGap) existing[idx].entryGap = nw.entryGap;
-            if(nw.stopDist && !existing[idx].stopDist) existing[idx].stopDist = nw.stopDist;
-            if(nw.weight && !existing[idx].weight) existing[idx].weight = nw.weight;
-            if(nw.lotId && !existing[idx].lotId) existing[idx].lotId = nw.lotId;
-            if(nw.market && !existing[idx].market) existing[idx].market = nw.market;
+            let changed=false;
+            ['entryDate','entryGap','stopDist','weight','lotId','market','totalAmt'].forEach(key=>{
+              if(fillEmpty(existing[idx],nw,key)) changed=true;
+            });
+            if(changed) metadataUpdated++;
             if(nw.memo && nw.memo!==existing[idx].memo){
               existing[idx].memo = existing[idx].memo ? existing[idx].memo+' / '+nw.memo : nw.memo;
+              memoUpdated++;
             }
-            memoUpdated++;
             dupSkip.push(nw);
             return;
           }
@@ -1866,11 +1991,11 @@ function pasteAppendTrades(){
         }
         if(match){
           const idx=existing.indexOf(match);
-          // 빈 필드 업데이트
-          if(nw.entryDate && !existing[idx].entryDate) existing[idx].entryDate = nw.entryDate;
-          if(nw.entryGap && !existing[idx].entryGap) existing[idx].entryGap = nw.entryGap;
-          if(nw.stopDist && !existing[idx].stopDist) existing[idx].stopDist = nw.stopDist;
-          if(nw.weight && !existing[idx].weight) existing[idx].weight = nw.weight;
+          let changed=false;
+          ['entryDate','entryGap','stopDist','weight','lotId','market','totalAmt'].forEach(key=>{
+            if(fillEmpty(existing[idx],nw,key)) changed=true;
+          });
+          if(changed) metadataUpdated++;
           if(nw.memo && nw.memo!==existing[idx].memo){
             existing[idx].memo = existing[idx].memo ? existing[idx].memo+' / '+nw.memo : nw.memo;
             memoUpdated++;
@@ -1927,7 +2052,7 @@ function pasteAppendTrades(){
       alert(msg); setStatus('pasteTradesStatus','❌ 처리 불가 '+conflicts.length+'건','err'); return;
     }
 
-    if(dupSkip.length && !clean.length && !exitAdded.length && !memoUpdated){
+    if(dupSkip.length && !clean.length && !exitAdded.length && !memoUpdated && !metadataUpdated){
       setStatus('pasteTradesStatus','ℹ️ 추가할 새 기록 없음 (전부 중복)','ok'); return;
     }
 
@@ -1938,8 +2063,10 @@ function pasteAppendTrades(){
     let msg='✅ ';
     if(clean.length) msg+=`진입 ${clean.length}건 추가`;
     if(exitAdded.length) msg+=(clean.length?' / ':'')+`청산 ${exitAdded.length}건 반영`;
+    if(metadataUpdated) msg+=` / 기존 Lot ${metadataUpdated}건 보완(${metadataFieldUpdated}개 필드)`;
     if(memoUpdated) msg+=` / 메모 ${memoUpdated}건`;
-    if(dupSkip.length) msg+=` / 중복 ${dupSkip.length}건 건너뜀`;
+    const pureDup=Math.max(0,dupSkip.length-metadataUpdated-memoUpdated);
+    if(pureDup) msg+=` / 중복 ${pureDup}건 건너뜀`;
     msg+=` (총 ${trades.length}건)`;
     setStatus('pasteTradesStatus',msg,'ok');
   }catch(e){
