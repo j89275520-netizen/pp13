@@ -220,6 +220,32 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 .em-btn.confirm { background:var(--accent); color:var(--bg); }
 .em-btn.cancel { background:var(--bg3); color:var(--text2); border:1px solid var(--border); }
 
+/* ── SYMBOL P&L PAGE ── */
+.pnl-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.pnl-summary-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:12px 14px;
+}
+.pnl-summary-label { font-size:10px; color:var(--text2); margin-bottom:5px; }
+.pnl-summary-value { font-family:var(--mono); font-size:18px; font-weight:700; }
+.pnl-summary-sub { font-family:var(--mono); font-size:9px; color:var(--text2); margin-top:3px; }
+.pnl-filter-row { display:flex; gap:6px; margin-bottom:8px; overflow-x:auto; padding-bottom:4px; }
+.date-range-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.date-range-label { font-size:10px; color:var(--text2); font-family:var(--mono); }
+.date-input { width:auto; min-width:132px; padding:6px 8px; font-size:11px; }
+.pnl-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  padding:12px 14px; margin-bottom:8px;
+}
+.pnl-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.pnl-symbol { font-family:var(--mono); font-size:13px; font-weight:700; color:var(--accent); }
+.pnl-name { font-size:10px; color:var(--text2); margin-top:2px; }
+.pnl-profit { font-family:var(--mono); font-size:15px; font-weight:700; text-align:right; white-space:nowrap; }
+.pnl-rate { font-family:var(--mono); font-size:10px; margin-top:2px; text-align:right; }
+.pnl-meta { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border); }
+.pnl-meta-item { display:flex; flex-direction:column; }
+.pnl-meta-label { font-size:9px; color:var(--text2); }
+.pnl-meta-value { font-family:var(--mono); font-size:11px; }
+
 /* ── STATS PAGE ── */
 .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
 .stats-card {
@@ -388,13 +414,18 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
   </div>
 </div>
 
-<!-- ════ PAGE: 포폴 ════ -->
-<div class="page active" id="page-portfolio">
+<!-- ════ PAGE: 종목손익 ════ -->
+<div class="page" id="page-symbol-pnl">
+  <div id="symbolPnlContent"></div>
+</div>
+
+<!-- ════ PAGE: 포폴 (데이터 호환용 비노출 페이지) ════ -->
+<div class="page" id="page-portfolio">
   <div id="portfolioList"></div>
 </div>
 
 <!-- ════ PAGE: 매매기록 ════ -->
-<div class="page" id="page-trades">
+<div class="page active" id="page-trades">
   <div class="filter-row" id="tradeFilters">
     <button class="filter-btn active" data-filter="전체" onclick="toggleFilter(this)">전체</button>
     <button class="filter-btn" data-filter="진행중" onclick="toggleFilter(this)">진행중</button>
@@ -422,6 +453,10 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
       <option value="청산일순">청산일순</option>
       <option value="종목별">종목별</option>
     </select>
+    <input type="date" class="em-input date-input" id="tradeDateFrom" aria-label="조회 시작일" onchange="tradeDateFrom=this.value;renderTrades()">
+    <span class="date-range-label">~</span>
+    <input type="date" class="em-input date-input" id="tradeDateTo" aria-label="조회 종료일" onchange="tradeDateTo=this.value;renderTrades()">
+    <button class="filter-btn" onclick="tradeYear='전체';tradeDateFrom='';tradeDateTo='';document.getElementById('tradeDateFrom').value='';document.getElementById('tradeDateTo').value='';renderTrades()" style="font-size:10px;padding:5px 10px;">기간 초기화</button>
     <button class="filter-btn" onclick="exportFilteredTrades()" style="margin-left:auto;font-size:10px;padding:5px 10px;">📤 내보내기</button>
   </div>
   <div id="tradeList"></div>
@@ -532,16 +567,16 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
-  <button class="nav-btn active" onclick="switchPage('portfolio',this)">
-    <span class="icon">📊</span>포폴
-  </button>
-  <button class="nav-btn" onclick="switchPage('trades',this)">
+  <button class="nav-btn active" data-page="trades" onclick="switchPage('trades',this)">
     <span class="icon">📋</span>매매기록
   </button>
-  <button class="nav-btn" onclick="switchPage('stats',this)">
+  <button class="nav-btn" data-page="symbol-pnl" onclick="switchPage('symbol-pnl',this)">
+    <span class="icon">💰</span>종목손익
+  </button>
+  <button class="nav-btn" data-page="stats" onclick="switchPage('stats',this)">
     <span class="icon">📈</span>통계
   </button>
-  <button class="nav-btn" onclick="switchPage('settings',this)">
+  <button class="nav-btn" data-page="settings" onclick="switchPage('settings',this)">
     <span class="icon">⚙️</span>설정
   </button>
 </nav>
@@ -780,6 +815,8 @@ let tradeYear = '전체';
 let tradeSort = '번호순';
 let tradeSymSearch = '';
 let tradeDateBasis = '진입일';
+let tradeDateFrom = '';
+let tradeDateTo = '';
 
 function loadPortfolio() {
   try { const s=localStorage.getItem('v2_portfolio'); return s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_PORTFOLIO)); } catch(e){return JSON.parse(JSON.stringify(DEFAULT_PORTFOLIO));}
@@ -798,15 +835,16 @@ function showBadge(id,msg) {
 // ═══════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════
-let _currentPage = 'portfolio';
+let _currentPage = 'trades';
 function switchPage(name, btn) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   btn.classList.add('active');
-  if(name==='portfolio') renderPortfolio();
-  if(name==='trades')    renderTrades();
-  if(name==='stats')     renderStats();
+  if(name==='symbol-pnl') renderSymbolPnl();
+  if(name==='portfolio')  renderPortfolio();
+  if(name==='trades')     renderTrades();
+  if(name==='stats')      renderStats();
   if(name !== _currentPage) {
     history.pushState({page: name}, '', '');
     _currentPage = name;
@@ -824,22 +862,185 @@ window.addEventListener('popstate', function(e) {
     return;
   }
   if(e.state && e.state.page) {
-    const btn = document.querySelector(`.nav-btn[onclick*="${e.state.page}"]`);
+    const targetPage = e.state.page === 'portfolio' ? 'symbol-pnl' : e.state.page;
+    const btn = document.querySelector(`.nav-btn[data-page="${targetPage}"]`);
     if(btn) {
       document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-      document.getElementById('page-'+e.state.page).classList.add('active');
+      document.getElementById('page-'+targetPage).classList.add('active');
       btn.classList.add('active');
-      _currentPage = e.state.page;
-      if(e.state.page==='portfolio') renderPortfolio();
-      if(e.state.page==='trades')    renderTrades();
-      if(e.state.page==='stats')     renderStats();
+      _currentPage = targetPage;
+      if(targetPage==='symbol-pnl') renderSymbolPnl();
+      if(targetPage==='trades')     renderTrades();
+      if(targetPage==='stats')      renderStats();
     }
   } else {
     // 더 이상 이전 탭 없으면 앱 최소화 (홈으로)
     history.pushState(null, '', '');
   }
 });
+
+// ═══════════════════════════════════════════════
+// SYMBOL P&L RENDER — 청산 체결 기준 실현손익
+// ═══════════════════════════════════════════════
+let symbolPnlYear='전체';
+let symbolPnlMonth='전체';
+let symbolPnlMarket='전체';
+let symbolPnlSort='손익순';
+let symbolPnlDateFrom='';
+let symbolPnlDateTo='';
+
+function collectExitRows() {
+  const rows=[];
+  trades.map(migrateTrade).forEach(t=>{
+    (t.exits||[]).forEach(e=>rows.push({
+      ...e,
+      sym:t.sym,
+      market:t.market,
+      entryPrice:Number(t.entryPrice||0),
+      entryDate:t.entryDate,
+      lotId:t.lotId
+    }));
+  });
+  return rows;
+}
+
+function pnlNameMap() {
+  const map={};
+  ['us','kr'].forEach(k=>{
+    (portfolio[k]||[]).forEach(x=>{ map[`${k.toUpperCase()}::${x.sym}`]=x.name||''; });
+  });
+  return map;
+}
+
+function formatPnlMoney(v, market) {
+  const n=Number(v||0);
+  const sign=n>0?'+':n<0?'-':'';
+  if(market==='KR') return sign+Math.abs(Math.round(n)).toLocaleString('ko-KR')+'원';
+  return sign+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function formatPnlInvested(v, market) {
+  const n=Number(v||0);
+  if(market==='KR') return Math.round(n).toLocaleString('ko-KR')+'원';
+  return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function renderSymbolPnl() {
+  const el=document.getElementById('symbolPnlContent');
+  if(!el) return;
+  const allRows=collectExitRows();
+  const years=new Set(),months=new Set();
+  allRows.forEach(e=>{
+    if(e.exitDate){years.add(e.exitDate.slice(0,4));months.add(e.exitDate.slice(0,7));}
+  });
+  const sortedYears=['전체',...[...years].sort().reverse()];
+  const sortedMonths=['전체',...[...months].sort().reverse()];
+
+  let filtered=allRows;
+  if(symbolPnlYear!=='전체') filtered=filtered.filter(e=>e.exitDate&&e.exitDate.startsWith(symbolPnlYear));
+  if(symbolPnlMonth!=='전체') filtered=filtered.filter(e=>e.exitDate&&e.exitDate.startsWith(symbolPnlMonth));
+  if(symbolPnlDateFrom) filtered=filtered.filter(e=>e.exitDate&&e.exitDate>=symbolPnlDateFrom);
+  if(symbolPnlDateTo) filtered=filtered.filter(e=>e.exitDate&&e.exitDate<=symbolPnlDateTo);
+  if(symbolPnlMarket!=='전체') filtered=filtered.filter(e=>e.market===symbolPnlMarket);
+
+  const map={};
+  filtered.forEach(e=>{
+    const qty=Number(e.exitQty||0),ep=Number(e.entryPrice||0),xp=Number(e.exitPrice||0);
+    if(!(qty>0) || !(ep>0) || !(xp>0)) return;
+    const key=`${e.market}::${e.sym}`;
+    if(!map[key]) map[key]={sym:e.sym,market:e.market,invested:0,profit:0,qty:0,exitCount:0,lots:new Set()};
+    const d=map[key];
+    d.invested+=ep*qty;
+    d.profit+=(xp-ep)*qty;
+    d.qty+=qty;
+    d.exitCount++;
+    d.lots.add(String(e.lotId||''));
+  });
+
+  let ranked=Object.values(map).map(d=>({
+    ...d,
+    rate:d.invested?d.profit/d.invested*100:0,
+    lotCount:[...d.lots].filter(Boolean).length
+  }));
+  if(symbolPnlSort==='손익순') ranked.sort((a,b)=>b.profit-a.profit);
+  else if(symbolPnlSort==='수익률순') ranked.sort((a,b)=>b.rate-a.rate);
+  else if(symbolPnlSort==='투자금액순') ranked.sort((a,b)=>b.invested-a.invested);
+  else ranked.sort((a,b)=>String(a.sym).localeCompare(String(b.sym),'ko'));
+
+  const us=ranked.filter(x=>x.market==='US');
+  const kr=ranked.filter(x=>x.market==='KR');
+  const usProfit=us.reduce((a,x)=>a+x.profit,0), usInv=us.reduce((a,x)=>a+x.invested,0);
+  const krProfit=kr.reduce((a,x)=>a+x.profit,0), krInv=kr.reduce((a,x)=>a+x.invested,0);
+  const usRate=usInv?usProfit/usInv*100:null, krRate=krInv?krProfit/krInv*100:null;
+  document.getElementById('topSub').textContent=`종목 ${ranked.length}개 · 청산 ${filtered.length}건`;
+
+  const filters=`<div class="pnl-filter-row">
+    <select class="em-select" style="width:auto;padding:5px 10px;font-size:11px;" onchange="symbolPnlYear=this.value;symbolPnlMonth='전체';renderSymbolPnl()">
+      ${sortedYears.map(y=>`<option value="${y}" ${y===symbolPnlYear?'selected':''}>${y==='전체'?'전체 연도':y+'년'}</option>`).join('')}
+    </select>
+    <select class="em-select" style="width:auto;padding:5px 10px;font-size:11px;" onchange="symbolPnlMonth=this.value;renderSymbolPnl()">
+      ${sortedMonths.map(m=>`<option value="${m}" ${m===symbolPnlMonth?'selected':''}>${m==='전체'?'전체 월':m}</option>`).join('')}
+    </select>
+    <select class="em-select" style="width:auto;padding:5px 10px;font-size:11px;" onchange="symbolPnlMarket=this.value;renderSymbolPnl()">
+      <option value="전체" ${symbolPnlMarket==='전체'?'selected':''}>전체 시장</option>
+      <option value="US" ${symbolPnlMarket==='US'?'selected':''}>US</option>
+      <option value="KR" ${symbolPnlMarket==='KR'?'selected':''}>KR</option>
+    </select>
+    <select class="em-select" style="width:auto;padding:5px 10px;font-size:11px;" onchange="symbolPnlSort=this.value;renderSymbolPnl()">
+      ${['손익순','수익률순','투자금액순','종목순'].map(v=>`<option value="${v}" ${v===symbolPnlSort?'selected':''}>${v}</option>`).join('')}
+    </select>
+  </div>
+  <div class="date-range-row">
+    <span class="date-range-label">청산일 기간</span>
+    <input type="date" class="em-input date-input" value="${symbolPnlDateFrom}" aria-label="손익 조회 시작일" onchange="symbolPnlDateFrom=this.value;renderSymbolPnl()">
+    <span class="date-range-label">~</span>
+    <input type="date" class="em-input date-input" value="${symbolPnlDateTo}" aria-label="손익 조회 종료일" onchange="symbolPnlDateTo=this.value;renderSymbolPnl()">
+    <button class="filter-btn" onclick="symbolPnlYear='전체';symbolPnlMonth='전체';symbolPnlDateFrom='';symbolPnlDateTo='';renderSymbolPnl()">기간 초기화</button>
+  </div>`;
+
+  const summary=`<div class="pnl-summary-grid">
+    <div class="pnl-summary-card">
+      <div class="pnl-summary-label">US 실현손익 합계</div>
+      <div class="pnl-summary-value ${usProfit>=0?'pos':'neg'}">${formatPnlMoney(usProfit,'US')}</div>
+      <div class="pnl-summary-sub">가중수익률 ${usRate==null?'N/A':(usRate>=0?'+':'')+usRate.toFixed(2)+'%'}</div>
+    </div>
+    <div class="pnl-summary-card">
+      <div class="pnl-summary-label">KR 실현손익 합계</div>
+      <div class="pnl-summary-value ${krProfit>=0?'pos':'neg'}">${formatPnlMoney(krProfit,'KR')}</div>
+      <div class="pnl-summary-sub">가중수익률 ${krRate==null?'N/A':(krRate>=0?'+':'')+krRate.toFixed(2)+'%'}</div>
+    </div>
+  </div>`;
+
+  if(!ranked.length){
+    el.innerHTML=filters+summary+`<div class="msg system" style="margin-top:30px;display:block;text-align:center;">청산 기록 없음</div>`;
+    return;
+  }
+
+  const names=pnlNameMap();
+  const renderGroup=(label,items)=>{
+    if(!items.length) return '';
+    return `<div class="section-label">${label}</div>`+items.map(d=>{
+      const cls=d.profit>0?'pos':d.profit<0?'neg':'neu';
+      const rateSign=d.rate>0?'+':'';
+      const name=names[`${d.market}::${d.sym}`]||'';
+      return `<div class="pnl-card">
+        <div class="pnl-card-top">
+          <div><div class="pnl-symbol">${d.sym}</div>${name?`<div class="pnl-name">${name}</div>`:''}</div>
+          <div><div class="pnl-profit ${cls}">${formatPnlMoney(d.profit,d.market)}</div><div class="pnl-rate ${cls}">${rateSign}${d.rate.toFixed(2)}%</div></div>
+        </div>
+        <div class="pnl-meta">
+          <div class="pnl-meta-item"><span class="pnl-meta-label">청산 원금</span><span class="pnl-meta-value">${formatPnlInvested(d.invested,d.market)}</span></div>
+          <div class="pnl-meta-item"><span class="pnl-meta-label">누적 청산수량</span><span class="pnl-meta-value">${d.qty.toLocaleString('ko-KR')}</span></div>
+          <div class="pnl-meta-item"><span class="pnl-meta-label">청산 횟수</span><span class="pnl-meta-value">${d.exitCount}건</span></div>
+          <div class="pnl-meta-item"><span class="pnl-meta-label">청산 Lot</span><span class="pnl-meta-value">${d.lotCount}개</span></div>
+        </div>
+      </div>`;
+    }).join('');
+  };
+
+  el.innerHTML=filters+summary+renderGroup('🇺🇸 US MARKET',us)+renderGroup('🇰🇷 KR MARKET',kr);
+}
 
 // ═══════════════════════════════════════════════
 // PORTFOLIO RENDER
@@ -849,12 +1050,14 @@ function fmtPct(v){ const n=parseFloat(v); return `<span class="${n>0?'pos':n<0?
 function fmtP(v,kr){ return kr?Number(v).toLocaleString('ko-KR'):Number(v).toFixed(2); }
 
 function renderPortfolio() {
+  const target=document.getElementById('portfolioList');
+  if(!target) return;
   const usN=portfolio.us.length, krN=portfolio.kr.length;
   document.getElementById('topSub').textContent=`총 ${usN+krN}종목 · US ${usN} / KR ${krN}`;
   let h='';
   h+=renderMarket('🇺🇸 US MARKET', portfolio.us, false);
   h+=renderMarket('🇰🇷 KR MARKET', portfolio.kr, true);
-  document.getElementById('portfolioList').innerHTML=h;
+  target.innerHTML=h;
 }
 
 function renderMarket(label, tickers, kr) {
@@ -1072,6 +1275,22 @@ function renderTrades() {
       }
     });
   }
+
+  if(tradeDateFrom || tradeDateTo){
+    const inRange=d=>!!d && (!tradeDateFrom || d>=tradeDateFrom) && (!tradeDateTo || d<=tradeDateTo);
+    filtered=filtered.filter(t=>tradeDateBasis==='청산일'
+      ? (t.exits||[]).some(e=>inRange(e.exitDate))
+      : inRange(t.entryDate));
+  }
+
+  const fromEl=document.getElementById('tradeDateFrom');
+  const toEl=document.getElementById('tradeDateTo');
+  if(fromEl && fromEl.value!==tradeDateFrom) fromEl.value=tradeDateFrom;
+  if(toEl && toEl.value!==tradeDateTo) toEl.value=tradeDateTo;
+
+  const openCount=filtered.filter(t=>Number(t.remainQty)>0).length;
+  const doneCount=filtered.length-openCount;
+  document.getElementById('topSub').textContent=`매매 ${filtered.length}건 · 진행중 ${openCount} / 완료 ${doneCount}`;
 
   if(!filtered.length) {
     document.getElementById('tradeList').innerHTML=`<div class="msg system" style="margin-top:40px;display:block;text-align:center;">매매기록 없음</div>`;
@@ -1827,8 +2046,15 @@ function exportFilteredTrades(){
       }
     });
   }
+  if(tradeDateFrom || tradeDateTo){
+    const inRange=d=>!!d && (!tradeDateFrom || d>=tradeDateFrom) && (!tradeDateTo || d<=tradeDateTo);
+    filtered=filtered.filter(t=>tradeDateBasis==='청산일'
+      ? (t.exits||[]).some(e=>inRange(e.exitDate))
+      : inRange(t.entryDate));
+  }
   if(!filtered.length){ alert('현재 필터 결과가 없습니다'); return; }
-  const label = `${[...tradeFilter].join('+')}${tradeSymSearch?'_'+tradeSymSearch:''}${tradeYear!=='전체'?'_'+tradeYear:''}`;
+  const periodLabel=(tradeDateFrom||tradeDateTo)?`_${tradeDateFrom||'처음'}~${tradeDateTo||'현재'}`:'';
+  const label = `${[...tradeFilter].join('+')}${tradeSymSearch?'_'+tradeSymSearch:''}${tradeYear!=='전체'?'_'+tradeYear:''}${periodLabel}`;
   _downloadJSON({trades:filtered,exportedAt:new Date().toISOString(),filter:label},`매매기록_${label}`);
 }
 function importTrades(){ _importJSON(data=>{ if(!data.trades){alert('매매기록 데이터가 없습니다');return;} if(!confirm('매매기록을 복구할까요?\n('+(data.exportedAt||'날짜 미상')+')'))return; trades=data.trades; saveTrades(); renderTrades(); alert('✅ 매매기록 복구 완료!'); }); }
@@ -2206,8 +2432,9 @@ window.onload=()=>{
     return migrateTrade(t);
   });
   if(migrated) saveTrades();
-  renderPortfolio();
+  renderTrades();
   detectPlatform();
+  history.replaceState({page:'trades'},'', '');
 };
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
